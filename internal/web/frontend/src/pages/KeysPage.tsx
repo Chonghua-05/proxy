@@ -26,9 +26,11 @@ import {
 } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDateTime } from '@/lib/format'
+import { useI18n } from '@/lib/i18n'
 import { listKeys, createKey, revokeKey, listProviders, type APIKey, type Provider } from '@/api/client'
 
 export default function KeysPage() {
+  const { t } = useI18n()
   const [keys, setKeys] = useState<APIKey[]>([])
   const [providers, setProviders] = useState<Provider[]>([])
   const [loading, setLoading] = useState(true)
@@ -66,7 +68,7 @@ export default function KeysPage() {
   async function handleCreate(e: FormEvent) {
     e.preventDefault()
     if (!name || !providerId) {
-      setError('Name and Provider are required.')
+      setError(t('keys.requiredFields'))
       return
     }
     setSubmitting(true)
@@ -93,7 +95,7 @@ export default function KeysPage() {
   async function handleRevoke(id: string) {
     try {
       await revokeKey(id)
-      setFlash('Key revoked.')
+      setFlash(t('keys.revokedSuccess'))
       reload()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to revoke key')
@@ -108,31 +110,31 @@ export default function KeysPage() {
     <div>
       <PageHeader
         index="02"
-        title="API keys"
-        description="Keys clients use to call the proxy. Each key maps to one provider."
+        title={t('keys.title')}
+        description={t('keys.description')}
         actions={
-          <Button onClick={() => setModalOpen(true)}>
-            <PlusIcon /> Create key
+          <Button onClick={() => setModalOpen(true)} className="w-full sm:w-auto">
+            <PlusIcon className="size-4" /> {t('keys.create')}
           </Button>
         }
       />
 
       {newKey && (
         <DismissibleAlert
-          title="new api key — copy it now, it will not be shown again"
+          title={t('keys.createdAlert')}
           className="mb-4"
           onClose={() => setNewKey('')}
           endAction={
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Copy key to clipboard"
+              aria-label={t('common.copy')}
               onClick={() => {
                 navigator.clipboard.writeText(newKey)
-                setFlash('Key copied to clipboard.')
+                setFlash(t('common.copied'))
               }}
             >
-              <CopyIcon />
+              <CopyIcon className="size-4" />
             </Button>
           }
         >
@@ -143,86 +145,88 @@ export default function KeysPage() {
       {flash && <DismissibleAlert variant="success" className="mb-4" onClose={() => setFlash('')}>{flash}</DismissibleAlert>}
       {error && <DismissibleAlert variant="destructive" className="mb-4" onClose={() => setError('')}>{error}</DismissibleAlert>}
 
-      <Card className="gap-0 py-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Provider</TableHead>
-              <TableHead className="text-right">RPM</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="w-12" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
+      <Card className="gap-0 py-0 overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={7} className="py-6 text-center font-mono text-xs text-muted-foreground">
-                  loading…
-                </TableCell>
+                <TableHead>{t('common.id')}</TableHead>
+                <TableHead>{t('common.name')}</TableHead>
+                <TableHead>{t('keys.provider')}</TableHead>
+                <TableHead className="text-right">RPM</TableHead>
+                <TableHead>{t('keys.status')}</TableHead>
+                <TableHead>{t('common.created')}</TableHead>
+                <TableHead className="w-12" />
               </TableRow>
-            ) : keys.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="py-6 text-center font-mono text-xs text-muted-foreground">
-                  no api keys created
-                </TableCell>
-              </TableRow>
-            ) : (
-              keys.map((k) => (
-                <TableRow key={k.id}>
-                  <TableCell className="font-mono text-xs text-muted-foreground">{k.id.slice(0, 8)}</TableCell>
-                  <TableCell>{k.name}</TableCell>
-                  <TableCell>{providerName(k.provider_id)}</TableCell>
-                  <TableCell className="text-right font-mono text-xs tabular-nums">{k.rate_limit_rpm}</TableCell>
-                  <TableCell>
-                    {k.revoked_at ? (
-                      <Badge variant="muted">revoked</Badge>
-                    ) : (
-                      <Badge variant="outline">
-                        <span className="size-1.5 bg-brass" aria-hidden />
-                        active
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">{formatDateTime(k.created_at)}</TableCell>
-                  <TableCell className="py-1 text-right">
-                    {!k.revoked_at && (
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Revoke key ${k.name}`}
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() => setRevokeTarget(k)}
-                      >
-                        <Trash2Icon />
-                      </Button>
-                    )}
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-6 text-center font-mono text-xs text-muted-foreground">
+                    {t('common.loading')}
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : keys.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-6 text-center font-mono text-xs text-muted-foreground">
+                    {t('keys.empty')}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                keys.map((k) => (
+                  <TableRow key={k.id}>
+                    <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{k.id.slice(0, 8)}</TableCell>
+                    <TableCell className="font-medium whitespace-nowrap">{k.name}</TableCell>
+                    <TableCell className="whitespace-nowrap">{providerName(k.provider_id)}</TableCell>
+                    <TableCell className="text-right font-mono text-xs tabular-nums">{k.rate_limit_rpm}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {k.revoked_at ? (
+                        <Badge variant="muted">{t('keys.revoked')}</Badge>
+                      ) : (
+                        <Badge variant="outline">
+                          <span className="size-1.5 bg-brass mr-1" aria-hidden />
+                          {t('keys.active')}
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(k.created_at)}</TableCell>
+                    <TableCell className="py-1 text-right whitespace-nowrap">
+                      {!k.revoked_at && (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Revoke key ${k.name}`}
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() => setRevokeTarget(k)}
+                        >
+                          <Trash2Icon className="size-4" />
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Create API key</DialogTitle>
-            <DialogDescription>The key value is shown once, on creation.</DialogDescription>
+            <DialogTitle>{t('keys.modalTitle')}</DialogTitle>
+            <DialogDescription>{t('keys.modalDescription')}</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreate} className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="key-name">Name</Label>
-              <Input id="key-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. my-app-key" />
+              <Label htmlFor="key-name">{t('common.name')}</Label>
+              <Input id="key-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('keys.namePlaceholder')} />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="key-provider">Provider</Label>
+              <Label htmlFor="key-provider">{t('keys.provider')}</Label>
               <Select value={providerId} onValueChange={setProviderId}>
                 <SelectTrigger id="key-provider" className="w-full">
-                  <SelectValue placeholder="Select a provider" />
+                  <SelectValue placeholder={t('keys.selectProvider')} />
                 </SelectTrigger>
                 <SelectContent>
                   {providers.map((p) => (
@@ -232,12 +236,13 @@ export default function KeysPage() {
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="key-rpm">Rate limit (RPM)</Label>
-              <Input id="key-rpm" type="number" value={rpm} onChange={(e) => setRpm(e.target.value)} />
+              <Label htmlFor="key-rpm">{t('keys.rateLimit')}</Label>
+              <Input id="key-rpm" type="number" value={rpm} onChange={(e) => setRpm(e.target.value)} placeholder={t('keys.rpmPlaceholder')} />
+              <p className="text-xs text-muted-foreground">{t('keys.rpmHint')}</p>
             </div>
             <DialogFooter>
               <Button type="submit" disabled={submitting}>
-                {submitting ? 'Creating…' : 'Create key'}
+                {submitting ? t('common.submitting') : t('keys.create')}
               </Button>
             </DialogFooter>
           </form>
@@ -247,9 +252,9 @@ export default function KeysPage() {
       <ConfirmDialog
         open={revokeTarget !== null}
         onOpenChange={(open) => { if (!open) setRevokeTarget(null) }}
-        title="Revoke API key"
-        description={`Revoke “${revokeTarget?.name}”? It will no longer be usable.`}
-        confirmLabel="Revoke"
+        title={t('keys.revokeConfirmTitle')}
+        description={t('keys.revokeConfirmDesc', { name: revokeTarget?.name || '' })}
+        confirmLabel={t('common.revoke')}
         onConfirm={() => { if (revokeTarget) handleRevoke(revokeTarget.id) }}
       />
     </div>

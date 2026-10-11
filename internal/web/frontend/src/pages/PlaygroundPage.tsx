@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { SendIcon, XIcon } from 'lucide-react'
+import { SendIcon, XIcon, SquareIcon } from 'lucide-react'
 
 import PageHeader from '@/components/PageHeader'
 import DismissibleAlert from '@/components/DismissibleAlert'
@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { useI18n } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
 interface Message {
@@ -16,6 +17,7 @@ interface Message {
 }
 
 export default function PlaygroundPage() {
+  const { t } = useI18n()
   const [apiKey, setApiKey] = useState('')
   const [model, setModel] = useState('')
   const [systemPrompt, setSystemPrompt] = useState('')
@@ -35,11 +37,11 @@ export default function PlaygroundPage() {
   async function sendMessage() {
     const text = input.trim()
     if (!apiKey.trim()) {
-      setError('Please enter an API key.')
+      setError(t('playground.apiKeyRequired'))
       return
     }
     if (!model.trim()) {
-      setError('Please enter a model name.')
+      setError(t('playground.modelRequired'))
       return
     }
     if (!text) return
@@ -137,6 +139,14 @@ export default function PlaygroundPage() {
     }
   }
 
+  function stopStreaming() {
+    if (abortRef.current) {
+      abortRef.current.abort()
+      abortRef.current = null
+    }
+    setStreaming(false)
+  }
+
   function clearConversation() {
     if (abortRef.current) abortRef.current.abort()
     setConversation([])
@@ -150,14 +160,14 @@ export default function PlaygroundPage() {
   }
 
   return (
-    <div className="flex h-[calc(100svh-3rem)] flex-col lg:h-[calc(100svh-4rem)]">
+    <div className="flex min-h-[calc(100svh-5rem)] md:h-[calc(100svh-4rem)] flex-col">
       <PageHeader
         index="05"
-        title="Playground"
-        description="Send a request through the proxy with one of its API keys."
+        title={t('playground.title')}
+        description={t('playground.description')}
         actions={
-          <Button variant="outline" size="sm" onClick={clearConversation}>
-            <XIcon /> Clear
+          <Button variant="outline" size="sm" onClick={clearConversation} className="w-full sm:w-auto">
+            <XIcon className="size-4" /> {t('playground.clearChat')}
           </Button>
         }
       />
@@ -165,63 +175,63 @@ export default function PlaygroundPage() {
       {error && <DismissibleAlert variant="destructive" className="mb-4" onClose={() => setError('')}>{error}</DismissibleAlert>}
 
       {/* Request configuration */}
-      <Card className="mb-4 py-4">
-        <CardContent className="grid gap-4 px-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor="pg-key">API key</Label>
+      <Card className="mb-4 py-3 sm:py-4">
+        <CardContent className="grid gap-3 sm:gap-4 px-3 sm:px-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="pg-key">{t('playground.apiKey')}</Label>
               <Input
                 id="pg-key"
                 type="password"
                 className="h-8 font-mono text-xs"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                placeholder="llmp-…"
+                placeholder={t('playground.apiKeyPlaceholder')}
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="pg-model">Model</Label>
+            <div className="grid gap-1.5">
+              <Label htmlFor="pg-model">{t('playground.model')}</Label>
               <Input
                 id="pg-model"
                 className="h-8 font-mono text-xs"
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                placeholder="e.g. gpt-4"
+                placeholder={t('playground.modelPlaceholder')}
               />
             </div>
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="pg-system">System prompt</Label>
+          <div className="grid gap-1.5">
+            <Label htmlFor="pg-system">{t('playground.systemPrompt')}</Label>
             <Textarea
               id="pg-system"
               className="min-h-8 text-xs"
               rows={1}
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
-              placeholder="Optional system prompt…"
+              placeholder={t('playground.systemPromptPlaceholder')}
             />
           </div>
         </CardContent>
       </Card>
 
       {/* Conversation log */}
-      <div className="mb-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto border bg-card p-4">
+      <div className="mb-4 flex min-h-[300px] flex-1 flex-col gap-3 overflow-y-auto border bg-card p-3 sm:p-4">
         {conversation.length === 0 ? (
-          <p className="mt-8 text-center font-mono text-xs text-muted-foreground">
-            send a message to start a conversation
+          <p className="my-auto text-center font-mono text-xs text-muted-foreground">
+            {t('playground.emptyChat')}
           </p>
         ) : (
           conversation.map((msg, i) => (
             <div
               key={i}
-              className={cn('flex max-w-[85%] flex-col gap-1', msg.role === 'user' ? 'self-end items-end' : 'self-start')}
+              className={cn('flex max-w-[92%] sm:max-w-[85%] flex-col gap-1', msg.role === 'user' ? 'self-end items-end' : 'self-start')}
             >
-              <span className="kicker text-muted-foreground">
-                {msg.role === 'user' ? 'you' : 'assistant'}
+              <span className="kicker text-muted-foreground text-xs">
+                {msg.role === 'user' ? 'User' : msg.role === 'system' ? 'System' : 'Assistant'}
               </span>
               <div
                 className={cn(
-                  'border px-3 py-2 text-sm whitespace-pre-wrap break-words',
+                  'border px-3 py-2 text-sm whitespace-pre-wrap break-words rounded-xs',
                   msg.role === 'user'
                     ? 'border-carbon bg-carbon text-bone dark:border-bone/90 dark:bg-bone/90 dark:text-ink'
                     : 'bg-background',
@@ -238,16 +248,22 @@ export default function PlaygroundPage() {
       {/* Input */}
       <div className="flex gap-2">
         <Input
-          className="flex-1"
-          placeholder="Type a message…"
+          className="flex-1 text-sm"
+          placeholder={t('playground.messagePlaceholder')}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={streaming}
         />
-        <Button onClick={sendMessage} disabled={streaming}>
-          <SendIcon /> {streaming ? 'Streaming…' : 'Send'}
-        </Button>
+        {streaming ? (
+          <Button variant="destructive" onClick={stopStreaming}>
+            <SquareIcon className="size-4" /> {t('playground.stop')}
+          </Button>
+        ) : (
+          <Button onClick={sendMessage} disabled={streaming}>
+            <SendIcon className="size-4" /> <span className="hidden sm:inline">{t('playground.send')}</span>
+          </Button>
+        )}
       </div>
     </div>
   )

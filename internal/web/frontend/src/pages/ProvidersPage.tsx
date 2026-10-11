@@ -18,9 +18,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDateTime } from '@/lib/format'
+import { useI18n } from '@/lib/i18n'
 import { listProviders, createProvider, deleteProvider, type Provider } from '@/api/client'
 
 export default function ProvidersPage() {
+  const { t } = useI18n()
   const [providers, setProviders] = useState<Provider[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -55,14 +57,14 @@ export default function ProvidersPage() {
   async function handleCreate(e: FormEvent) {
     e.preventDefault()
     if (!name || !baseUrl || !apiKey) {
-      setError('All fields are required.')
+      setError(t('providers.allRequired'))
       return
     }
     setSubmitting(true)
     setError('')
     try {
       await createProvider({ name, base_url: baseUrl, api_key: apiKey })
-      setFlash('Provider created successfully.')
+      setFlash(t('providers.createdSuccess'))
       setName('')
       setBaseUrl('')
       setApiKey('')
@@ -78,7 +80,7 @@ export default function ProvidersPage() {
   async function handleDelete(id: string) {
     try {
       await deleteProvider(id)
-      setFlash('Provider deleted.')
+      setFlash(t('providers.deletedSuccess'))
       reload()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to delete provider')
@@ -89,11 +91,11 @@ export default function ProvidersPage() {
     <div>
       <PageHeader
         index="01"
-        title="Providers"
-        description="The upstream LLM backends that requests are forwarded to."
+        title={t('providers.title')}
+        description={t('providers.description')}
         actions={
-          <Button onClick={() => setModalOpen(true)}>
-            <PlusIcon /> Add provider
+          <Button onClick={() => setModalOpen(true)} className="w-full sm:w-auto">
+            <PlusIcon className="size-4" /> {t('providers.add')}
           </Button>
         }
       />
@@ -101,89 +103,91 @@ export default function ProvidersPage() {
       {flash && <DismissibleAlert variant="success" className="mb-4" onClose={() => setFlash('')}>{flash}</DismissibleAlert>}
       {error && <DismissibleAlert variant="destructive" className="mb-4" onClose={() => setError('')}>{error}</DismissibleAlert>}
 
-      <Card className="gap-0 py-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Base URL</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="w-12" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
+      <Card className="gap-0 py-0 overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={5} className="py-6 text-center font-mono text-xs text-muted-foreground">
-                  loading…
-                </TableCell>
+                <TableHead>{t('common.id')}</TableHead>
+                <TableHead>{t('common.name')}</TableHead>
+                <TableHead>{t('providers.baseUrl')}</TableHead>
+                <TableHead>{t('common.created')}</TableHead>
+                <TableHead className="w-12" />
               </TableRow>
-            ) : providers.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="py-6 text-center font-mono text-xs text-muted-foreground">
-                  no providers configured
-                </TableCell>
-              </TableRow>
-            ) : (
-              providers.map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell className="font-mono text-xs text-muted-foreground">{p.id.slice(0, 8)}</TableCell>
-                  <TableCell>{p.name}</TableCell>
-                  <TableCell className="font-mono text-xs">{p.base_url}</TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">{formatDateTime(p.created_at)}</TableCell>
-                  <TableCell className="py-1 text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`Delete provider ${p.name}`}
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => setDeleteTarget(p)}
-                    >
-                      <Trash2Icon />
-                    </Button>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-6 text-center font-mono text-xs text-muted-foreground">
+                    {t('common.loading')}
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : providers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-6 text-center font-mono text-xs text-muted-foreground">
+                    {t('providers.empty')}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                providers.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{p.id.slice(0, 8)}</TableCell>
+                    <TableCell className="font-medium whitespace-nowrap">{p.name}</TableCell>
+                    <TableCell className="font-mono text-xs max-w-xs truncate">{p.base_url}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(p.created_at)}</TableCell>
+                    <TableCell className="py-1 text-right whitespace-nowrap">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Delete provider ${p.name}`}
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => setDeleteTarget(p)}
+                      >
+                        <Trash2Icon className="size-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add provider</DialogTitle>
-            <DialogDescription>Register an upstream backend and the key used to reach it.</DialogDescription>
+            <DialogTitle>{t('providers.modalTitle')}</DialogTitle>
+            <DialogDescription>{t('providers.modalDescription')}</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreate} className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="provider-name">Name</Label>
-              <Input id="provider-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. OpenAI" />
+              <Label htmlFor="provider-name">{t('common.name')}</Label>
+              <Input id="provider-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('providers.namePlaceholder')} />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="provider-url">Base URL</Label>
+              <Label htmlFor="provider-url">{t('providers.baseUrl')}</Label>
               <Input
                 id="provider-url"
                 className="font-mono text-xs"
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
-                placeholder="https://api.openai.com"
+                placeholder={t('providers.baseUrlPlaceholder')}
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="provider-key">API key</Label>
+              <Label htmlFor="provider-key">{t('providers.apiKey')}</Label>
               <Input
                 id="provider-key"
                 type="password"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                placeholder="sk-…"
+                placeholder={t('providers.apiKeyPlaceholder')}
               />
             </div>
             <DialogFooter>
               <Button type="submit" disabled={submitting}>
-                {submitting ? 'Creating…' : 'Create provider'}
+                {submitting ? t('common.submitting') : t('providers.add')}
               </Button>
             </DialogFooter>
           </form>
@@ -193,9 +197,9 @@ export default function ProvidersPage() {
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
-        title="Delete provider"
-        description={`Delete “${deleteTarget?.name}”? All associated API keys will also be deleted.`}
-        confirmLabel="Delete"
+        title={t('providers.deleteConfirmTitle')}
+        description={t('providers.deleteConfirmDesc', { name: deleteTarget?.name || '' })}
+        confirmLabel={t('common.delete')}
         onConfirm={() => { if (deleteTarget) handleDelete(deleteTarget.id) }}
       />
     </div>
