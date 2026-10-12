@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ChevronLeftIcon, ChevronRightIcon, TrendingUpIcon, BarChart3Icon, PieChartIcon, RefreshCwIcon } from 'lucide-react'
+import { ChevronLeftIcon, ChevronRightIcon, TrendingUpIcon, RefreshCwIcon } from 'lucide-react'
 
 import PageHeader from '@/components/PageHeader'
 import DismissibleAlert from '@/components/DismissibleAlert'
@@ -57,6 +57,7 @@ export default function UsagePage() {
   const [filterStart, setFilterStart] = useState('')
   const [filterEnd, setFilterEnd] = useState('')
   const [page, setPage] = useState(1)
+  const [rankingTab, setRankingTab] = useState<'keys' | 'models'>('keys')
   const perPage = 50
 
   const [refreshTick, setRefreshTick] = useState(0)
@@ -228,8 +229,8 @@ export default function UsagePage() {
 
       {/* 图表区 */}
       <div className="grid grid-cols-1 gap-8 pb-6 border-b lg:grid-cols-3">
-        {/* 柱状时序走势：固定 h-72 撑满上下 */}
-        <div className="lg:col-span-2 flex flex-col justify-between h-72">
+        {/* 柱状时序走势：高度 h-56 */}
+        <div className="lg:col-span-2 flex flex-col justify-between h-56">
           <div className="flex items-center justify-between shrink-0 mb-1">
             <div className="flex items-center gap-2">
               <TrendingUpIcon className="size-4 text-brass" />
@@ -257,7 +258,7 @@ export default function UsagePage() {
                 {/* 柱状图 */}
                 <div className="relative z-10 flex w-full h-full items-end gap-1.5 px-1">
                   {timeline.map((tp, idx) => {
-                    const heightPct = Math.max(6, Math.round((tp.total_tokens / maxTokens) * 100))
+                    const heightPct = Math.max(8, Math.round((tp.total_tokens / maxTokens) * 100))
                     return (
                       <div
                         key={idx}
@@ -287,59 +288,85 @@ export default function UsagePage() {
           )}
         </div>
 
-        {/* 模型分布与活跃 Key 排行：固定 h-72，严格等高 */}
-        <div className="flex flex-col justify-between h-72">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <BarChart3Icon className="size-4 text-brass" />
-              <h2 className="text-sm font-medium">{t('usage.topModelsTitle')}</h2>
+        {/* 右侧排行榜：高度 h-56，严格与左侧一致，顶部带 Tab 切换 */}
+        <div className="flex flex-col justify-between h-56">
+          <div className="flex items-center justify-between shrink-0 pb-1 border-b">
+            <div className="flex items-center gap-1 p-0.5 bg-muted/40 rounded-md">
+              <button
+                type="button"
+                onClick={() => setRankingTab('keys')}
+                className={`px-2 py-1 text-xs font-medium rounded transition-all ${
+                  rankingTab === 'keys'
+                    ? 'bg-card text-foreground shadow-2xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {t('usage.topKeysTitle')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setRankingTab('models')}
+                className={`px-2 py-1 text-xs font-medium rounded transition-all ${
+                  rankingTab === 'models'
+                    ? 'bg-card text-foreground shadow-2xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {t('usage.topModelsTitle')}
+              </button>
             </div>
-            {topModels.length === 0 ? (
-              <p className="py-2 font-mono text-xs text-muted-foreground">{t('usage.noChartData')}</p>
-            ) : (
-              <div className="space-y-2 pt-0.5">
-                {topModels.slice(0, 4).map((m, idx) => {
-                  const pct = Math.round((m.total_tokens / maxModelTokens) * 100)
-                  return (
-                    <div key={idx} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs font-mono">
-                        <span className="truncate max-w-[150px]" title={m.model}>{m.model}</span>
-                        <span className="text-muted-foreground">{formatCompact(m.total_tokens)}</span>
-                      </div>
-                      <div className="h-1.5 w-full bg-secondary overflow-hidden rounded-full">
-                        <div style={{ width: `${pct}%` }} className="h-full bg-foreground/80 rounded-full" />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
           </div>
 
-          <div className="space-y-2 pt-3 border-t">
-            <div className="flex items-center gap-2">
-              <PieChartIcon className="size-4 text-brass" />
-              <h2 className="text-sm font-medium">{t('usage.topKeysTitle')}</h2>
-            </div>
-            {topKeys.length === 0 ? (
-              <p className="py-2 font-mono text-xs text-muted-foreground">{t('usage.noChartData')}</p>
-            ) : (
-              <div className="space-y-2 pt-0.5">
-                {topKeys.slice(0, 2).map((k, idx) => {
+          {/* 榜单内容区：撑满剩余高度并均匀排版 */}
+          <div className="flex-1 overflow-y-auto py-2 space-y-2.5">
+            {rankingTab === 'keys' ? (
+              topKeys.length === 0 ? (
+                <div className="flex h-full items-center justify-center font-mono text-xs text-muted-foreground">
+                  {t('usage.noChartData')}
+                </div>
+              ) : (
+                topKeys.slice(0, 5).map((k, idx) => {
                   const pct = Math.round((k.total_tokens / maxKeyTokens) * 100)
                   return (
                     <div key={idx} className="space-y-1">
                       <div className="flex items-center justify-between text-xs font-mono">
-                        <span className="truncate max-w-[150px]">{keyName(k.api_key_id)}</span>
-                        <span className="text-muted-foreground">{formatCompact(k.total_tokens)}</span>
+                        <div className="flex items-center gap-1.5 truncate max-w-[170px]">
+                          <span className="text-[10px] text-muted-foreground/60 w-3.5">{idx + 1}.</span>
+                          <span className="truncate">{keyName(k.api_key_id)}</span>
+                        </div>
+                        <span className="text-muted-foreground shrink-0">{formatCompact(k.total_tokens)}</span>
                       </div>
                       <div className="h-1.5 w-full bg-secondary overflow-hidden rounded-full">
                         <div style={{ width: `${pct}%` }} className="h-full bg-brass/90 rounded-full" />
                       </div>
                     </div>
                   )
-                })}
-              </div>
+                })
+              )
+            ) : (
+              topModels.length === 0 ? (
+                <div className="flex h-full items-center justify-center font-mono text-xs text-muted-foreground">
+                  {t('usage.noChartData')}
+                </div>
+              ) : (
+                topModels.slice(0, 5).map((m, idx) => {
+                  const pct = Math.round((m.total_tokens / maxModelTokens) * 100)
+                  return (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs font-mono">
+                        <div className="flex items-center gap-1.5 truncate max-w-[170px]">
+                          <span className="text-[10px] text-muted-foreground/60 w-3.5">{idx + 1}.</span>
+                          <span className="truncate" title={m.model}>{m.model}</span>
+                        </div>
+                        <span className="text-muted-foreground shrink-0">{formatCompact(m.total_tokens)}</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-secondary overflow-hidden rounded-full">
+                        <div style={{ width: `${pct}%` }} className="h-full bg-foreground/80 rounded-full" />
+                      </div>
+                    </div>
+                  )
+                })
+              )
             )}
           </div>
         </div>
