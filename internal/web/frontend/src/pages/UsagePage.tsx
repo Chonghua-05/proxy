@@ -31,9 +31,9 @@ const ALL = 'all'
 
 function MetricItem({ label, value }: { label: string; value: number }) {
   return (
-    <div className="flex flex-col py-1">
-      <span className="kicker text-muted-foreground/80">{label}</span>
-      <span className="mt-1 font-mono text-2xl font-medium tracking-tight" title={value.toLocaleString()}>
+    <div className="flex flex-col py-0.5">
+      <span className="text-[11px] font-mono tracking-wider uppercase text-muted-foreground">{label}</span>
+      <span className="mt-1 font-mono text-xl font-medium tracking-tight" title={value.toLocaleString()}>
         {formatCompact(value)}
       </span>
     </div>
@@ -136,18 +136,17 @@ export default function UsagePage() {
   const maxKeyTokens = Math.max(1, ...topKeys.map((k) => k.total_tokens))
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
-        index="03"
         title={t('usage.title')}
         description={t('usage.description')}
         actions={
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={reload}
             disabled={refreshing || loading}
-            className="gap-1.5 border border-border/80"
+            className="h-8 gap-1.5 text-xs"
             aria-label={t('common.refresh')}
           >
             <RefreshCwIcon className={`size-3.5 ${refreshing ? 'animate-spin' : ''}`} />
@@ -158,20 +157,20 @@ export default function UsagePage() {
 
       {error && <DismissibleAlert variant="destructive" onClose={() => setError('')}>{error}</DismissibleAlert>}
 
-      {/* 无卡片指标平铺栏 */}
-      <div className="grid grid-cols-2 gap-4 pb-6 border-b sm:grid-cols-4">
+      {/* 指标条 */}
+      <div className="grid grid-cols-2 gap-4 pb-5 border-b sm:grid-cols-4">
         <MetricItem label={t('usage.statRequests')} value={summary?.total_requests || total} />
         <MetricItem label={t('usage.statPrompt')} value={summary?.total_prompt || 0} />
         <MetricItem label={t('usage.statCompletion')} value={summary?.total_completion || 0} />
         <MetricItem label={t('usage.statTotal')} value={summary?.total_tokens || 0} />
       </div>
 
-      {/* 筛选栏：直接融于版面，无卡片外壳 */}
-      <div className="flex flex-wrap items-end gap-3 pb-6 border-b sm:gap-4">
-        <div className="grid gap-1.5 w-full sm:w-44">
-          <Label htmlFor="filter-key" className="text-xs text-muted-foreground">{t('usage.filterKey')}</Label>
+      {/* 筛选器 */}
+      <div className="flex flex-wrap items-center gap-3 pb-5 border-b text-xs">
+        <div className="flex items-center gap-2">
+          <Label htmlFor="filter-key" className="text-xs text-muted-foreground shrink-0">{t('usage.filterKey')}</Label>
           <Select value={filterKeyId} onValueChange={(v) => { setFilterKeyId(v); setPage(1) }}>
-            <SelectTrigger id="filter-key" size="sm" className="w-full bg-transparent">
+            <SelectTrigger id="filter-key" size="sm" className="h-8 w-36 bg-card/50 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -182,10 +181,11 @@ export default function UsagePage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="grid gap-1.5 w-full sm:w-44">
-          <Label htmlFor="filter-provider" className="text-xs text-muted-foreground">{t('usage.filterProvider')}</Label>
+
+        <div className="flex items-center gap-2">
+          <Label htmlFor="filter-provider" className="text-xs text-muted-foreground shrink-0">{t('usage.filterProvider')}</Label>
           <Select value={filterProviderId} onValueChange={(v) => { setFilterProviderId(v); setPage(1) }}>
-            <SelectTrigger id="filter-provider" size="sm" className="w-full bg-transparent">
+            <SelectTrigger id="filter-provider" size="sm" className="h-8 w-36 bg-card/50 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -196,34 +196,39 @@ export default function UsagePage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="grid gap-1.5 w-full sm:w-40">
-          <Label htmlFor="filter-start" className="text-xs text-muted-foreground">{t('usage.filterStart')}</Label>
+
+        <div className="flex items-center gap-2">
+          <Label htmlFor="filter-start" className="text-xs text-muted-foreground shrink-0">{t('usage.filterStart')}</Label>
           <Input
             id="filter-start"
             type="datetime-local"
-            className="h-8 font-mono text-xs w-full bg-transparent"
+            className="h-8 w-44 font-mono text-xs bg-card/50"
             value={filterStart}
             onChange={(e) => { setFilterStart(e.target.value); setPage(1) }}
           />
         </div>
-        <div className="grid gap-1.5 w-full sm:w-40">
-          <Label htmlFor="filter-end" className="text-xs text-muted-foreground">{t('usage.filterEnd')}</Label>
+
+        <div className="flex items-center gap-2">
+          <Label htmlFor="filter-end" className="text-xs text-muted-foreground shrink-0">{t('usage.filterEnd')}</Label>
           <Input
             id="filter-end"
             type="datetime-local"
-            className="h-8 font-mono text-xs w-full bg-transparent"
+            className="h-8 w-44 font-mono text-xs bg-card/50"
             value={filterEnd}
             onChange={(e) => { setFilterEnd(e.target.value); setPage(1) }}
           />
         </div>
-        <Button size="sm" variant="ghost" onClick={clearFilters} className="text-muted-foreground hover:text-foreground">
-          {t('usage.clearFilters')}
-        </Button>
+
+        {(filterKeyId !== ALL || filterProviderId !== ALL || filterStart || filterEnd) && (
+          <Button size="sm" variant="ghost" onClick={clearFilters} className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground">
+            {t('usage.clearFilters')}
+          </Button>
+        )}
       </div>
 
-      {/* 无卡片式图表走势与排行区 */}
+      {/* 图表区 */}
       <div className="grid grid-cols-1 gap-8 pb-6 border-b lg:grid-cols-3">
-        {/* 时间线趋势区 */}
+        {/* 柱状时序走势 */}
         <div className="lg:col-span-2 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -236,40 +241,44 @@ export default function UsagePage() {
           </div>
 
           {timeline.length === 0 ? (
-            <div className="flex h-44 items-center justify-center font-mono text-xs text-muted-foreground border border-dashed rounded-md">
+            <div className="flex h-40 items-center justify-center font-mono text-xs text-muted-foreground border border-dashed rounded-md">
               {t('usage.noChartData')}
             </div>
           ) : (
-            <div className="flex h-44 items-end gap-1.5 pt-4 overflow-x-auto pb-2 border-b">
-              {timeline.map((tp, idx) => {
-                const heightPct = Math.max(8, Math.round((tp.total_tokens / maxTokens) * 100))
-                const shortTime = tp.timestamp.slice(5)
-                return (
-                  <div
-                    key={idx}
-                    className="group relative flex flex-1 min-w-[22px] flex-col items-center justify-end h-full"
-                  >
-                    <div className="absolute -top-10 z-10 hidden whitespace-nowrap rounded bg-popover px-2 py-1 font-mono text-[11px] shadow border text-popover-foreground group-hover:flex flex-col items-center">
-                      <span>{tp.timestamp}</span>
-                      <span>{tp.total_tokens.toLocaleString()} tokens ({tp.requests} reqs)</span>
-                    </div>
+            <div>
+              <div className="flex h-36 items-end gap-1.5 pt-2">
+                {timeline.map((tp, idx) => {
+                  const heightPct = Math.max(6, Math.round((tp.total_tokens / maxTokens) * 100))
+                  return (
                     <div
-                      style={{ height: `${heightPct}%` }}
-                      className="w-full bg-brass/80 hover:bg-brass transition-all rounded-t-xs"
-                    />
-                    <span className="mt-1 font-mono text-[9px] text-muted-foreground/70 -rotate-45 truncate max-w-[28px]">
-                      {shortTime}
-                    </span>
-                  </div>
-                )
-              })}
+                      key={idx}
+                      className="group relative flex flex-1 min-w-[12px] flex-col items-center justify-end h-full"
+                    >
+                      <div className="absolute -top-12 z-20 hidden whitespace-nowrap rounded-md bg-popover px-2.5 py-1.5 font-mono text-[11px] shadow-lg border text-popover-foreground group-hover:flex flex-col items-center pointer-events-none">
+                        <span className="text-muted-foreground">{tp.timestamp}</span>
+                        <span className="font-medium text-foreground">{tp.total_tokens.toLocaleString()} tokens ({tp.requests} reqs)</span>
+                      </div>
+                      <div
+                        style={{ height: `${heightPct}%` }}
+                        className="w-full bg-brass/80 hover:bg-brass transition-all rounded-xs"
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+              {/* 平整的时间刻度，只显示首尾与中间，不重叠 */}
+              <div className="mt-2 flex justify-between border-t pt-1 font-mono text-[10px] text-muted-foreground/80">
+                <span>{timeline[0]?.timestamp.slice(5)}</span>
+                {timeline.length > 4 && <span>{timeline[Math.floor(timeline.length / 2)]?.timestamp.slice(5)}</span>}
+                <span>{timeline[timeline.length - 1]?.timestamp.slice(5)}</span>
+              </div>
             </div>
           )}
         </div>
 
         {/* 模型分布与活跃 Key 排行 */}
-        <div className="space-y-6">
-          <div className="space-y-3">
+        <div className="space-y-5">
+          <div className="space-y-2.5">
             <div className="flex items-center gap-2">
               <BarChart3Icon className="size-4 text-brass" />
               <h2 className="text-sm font-medium">{t('usage.topModelsTitle')}</h2>
@@ -277,7 +286,7 @@ export default function UsagePage() {
             {topModels.length === 0 ? (
               <p className="py-2 font-mono text-xs text-muted-foreground">{t('usage.noChartData')}</p>
             ) : (
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 {topModels.slice(0, 5).map((m, idx) => {
                   const pct = Math.round((m.total_tokens / maxModelTokens) * 100)
                   return (
@@ -296,7 +305,7 @@ export default function UsagePage() {
             )}
           </div>
 
-          <div className="space-y-3 pt-3 border-t">
+          <div className="space-y-2.5 pt-3 border-t">
             <div className="flex items-center gap-2">
               <PieChartIcon className="size-4 text-brass" />
               <h2 className="text-sm font-medium">{t('usage.topKeysTitle')}</h2>
@@ -325,13 +334,13 @@ export default function UsagePage() {
         </div>
       </div>
 
-      {/* 明细日志列表：取消外层 Card 包裹，直接融入页面 */}
-      <div className="space-y-3">
-        <p className="kicker text-muted-foreground">{t('usage.recentLogs')}</p>
+      {/* 明细日志 */}
+      <div className="space-y-2">
+        <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">{t('usage.recentLogs')}</h3>
         <div className="overflow-x-auto border-y">
           <Table>
             <TableHeader>
-              <TableRow className="border-b bg-muted/30">
+              <TableRow className="border-b bg-muted/20">
                 <TableHead>{t('common.id')}</TableHead>
                 <TableHead>{t('keys.title')}</TableHead>
                 <TableHead>{t('keys.provider')}</TableHead>
@@ -373,7 +382,6 @@ export default function UsagePage() {
           </Table>
         </div>
 
-        {/* 分页控制 */}
         {totalPages > 1 && (
           <div className="pt-2 flex items-center justify-between">
             <span className="font-mono text-xs text-muted-foreground">
