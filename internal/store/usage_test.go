@@ -161,3 +161,44 @@ func TestUsageStore_Query_DefaultLimit(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
+
+func TestUsageStore_GetSummary(t *testing.T) {
+	database := setupTestDB(t)
+	ps := NewProviderStore(database)
+	ks := NewAPIKeyStore(database)
+	us := NewUsageStore(database)
+
+	p, err := ps.Create("summary-p", "https://sum.com", "sk-sum")
+	require.NoError(t, err)
+
+	k1, _, err := ks.Create("key-1", p.ID, 0)
+	require.NoError(t, err)
+	k2, _, err := ks.Create("key-2", p.ID, 0)
+	require.NoError(t, err)
+
+	// Record entries
+	err = us.Record(k1.ID, p.ID, "gpt-4", 100, 200, 300)
+	require.NoError(t, err)
+	err = us.Record(k1.ID, p.ID, "claude-3", 50, 50, 100)
+	require.NoError(t, err)
+	err = us.Record(k2.ID, p.ID, "gpt-4", 200, 100, 300)
+	require.NoError(t, err)
+
+	// Full summary
+	sum, err := us.GetSummary(UsageQuery{})
+	require.NoError(t, err)
+	assert.Equal(t, 3, sum.TotalRequests)
+	assert.Equal(t, 350, sum.TotalPrompt)
+	assert.Equal(t, 350, sum.TotalCompletion)
+	assert.Equal(t, 700, sum.TotalTokens)
+	assert.NotEmpty(t, sum.Timeline)
+	assert.NotEmpty(t, sum.TopModels)
+	assert.NotEmpty(t, sum.TopKeys)
+
+	// Filtered summary by key
+	sumKey, err := us.GetSummary(UsageQuery{APIKeyID: k1.ID})
+	require.NoError(t, err)
+	assert.Equal(t, 2, sumKey.TotalRequests)
+	assert.Equal(t, 400, sumKey.TotalTokens)
+}
+

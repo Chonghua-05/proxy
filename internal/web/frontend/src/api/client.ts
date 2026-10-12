@@ -90,6 +90,10 @@ export function revokeKey(id: string): Promise<void> {
   return request(`/keys/${id}`, { method: 'DELETE' })
 }
 
+export function updateKey(id: string, data: { name?: string; provider_id?: string; rate_limit_rpm?: number }): Promise<APIKey> {
+  return request(`/keys/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+
 // ── Usage ──────────────────────────────────────────────────────────────
 
 export interface UsageRecord {
@@ -108,9 +112,44 @@ export interface UsageResult {
   total: number
 }
 
+export interface TimelinePoint {
+  timestamp: string
+  requests: number
+  prompt_tokens: number
+  completion_tokens: number
+  total_tokens: number
+}
+
+export interface ModelStat {
+  model: string
+  requests: number
+  total_tokens: number
+}
+
+export interface KeyStat {
+  api_key_id: string
+  requests: number
+  total_tokens: number
+}
+
+export interface UsageSummary {
+  total_requests: number
+  total_prompt: number
+  total_completion: number
+  total_tokens: number
+  timeline: TimelinePoint[] | null
+  top_models: ModelStat[] | null
+  top_keys: KeyStat[] | null
+}
+
 export function queryUsage(params: Record<string, string>): Promise<UsageResult> {
   const qs = new URLSearchParams(params).toString()
   return request(`/usage?${qs}`)
+}
+
+export function getUsageSummary(params: Record<string, string> = {}): Promise<UsageSummary> {
+  const qs = new URLSearchParams(params).toString()
+  return request(`/usage/summary?${qs}`)
 }
 
 // ── Guardrails ─────────────────────────────────────────────────────────

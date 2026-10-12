@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -432,3 +433,49 @@ func TestIntParam(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateAPIKey_Success(t *testing.T) {
+	h, ps, ks, _ := setupAdminHandler(t)
+	e := echo.New()
+
+	p1, err := ps.Create("p1", "https://p1.com", "k1")
+	require.NoError(t, err)
+	p2, err := ps.Create("p2", "https://p2.com", "k2")
+	require.NoError(t, err)
+
+	k, _, err := ks.Create("initial-key", p1.ID, 30)
+	require.NoError(t, err)
+
+	body := fmt.Sprintf(`{"name":"updated-key","provider_id":"%s","rate_limit_rpm":120}`, p2.ID)
+	req := httptest.NewRequest(http.MethodPut, "/admin/keys/"+k.ID, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(k.ID)
+
+	err = h.UpdateAPIKey(c)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestGetUsageSummary_Success(t *testing.T) {
+	h, ps, ks, us := setupAdminHandler(t)
+	e := echo.New()
+
+	p, err := ps.Create("test-sum", "https://test.com", "key")
+	require.NoError(t, err)
+	k, _, err := ks.Create("sum-key", p.ID, 0)
+	require.NoError(t, err)
+	err = us.Record(k.ID, p.ID, "gpt-4", 100, 50, 150)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/usage/summary?api_key_id="+k.ID, nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err = h.GetUsageSummary(c)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+

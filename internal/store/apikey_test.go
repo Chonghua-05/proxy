@@ -146,3 +146,43 @@ func TestGenerateKey(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEqual(t, key1, key2) // should be unique
 }
+
+func TestAPIKeyStore_Update(t *testing.T) {
+	database := setupTestDB(t)
+	ps := NewProviderStore(database)
+	ks := NewAPIKeyStore(database)
+
+	p1, err := ps.Create("provider-1", "https://p1.com", "sk-1")
+	require.NoError(t, err)
+	p2, err := ps.Create("provider-2", "https://p2.com", "sk-2")
+	require.NoError(t, err)
+
+	key, _, err := ks.Create("initial-name", p1.ID, 30)
+	require.NoError(t, err)
+
+	// Update name only
+	newName := "updated-name"
+	updated, err := ks.Update(key.ID, &newName, nil, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "updated-name", updated.Name)
+	assert.Equal(t, p1.ID, updated.ProviderID)
+	assert.Equal(t, 30, updated.RateLimitRPM)
+
+	// Update provider and rate limit
+	newRPM := 120
+	updated2, err := ks.Update(key.ID, nil, &p2.ID, &newRPM)
+	require.NoError(t, err)
+	assert.Equal(t, "updated-name", updated2.Name)
+	assert.Equal(t, p2.ID, updated2.ProviderID)
+	assert.Equal(t, 120, updated2.RateLimitRPM)
+
+	// Update nonexistent
+	_, err = ks.Update("nonexistent-id", &newName, nil, nil)
+	assert.Equal(t, sql.ErrNoRows, err)
+
+	// No-op update returns current
+	same, err := ks.Update(key.ID, nil, nil, nil)
+	require.NoError(t, err)
+	assert.Equal(t, updated2.ID, same.ID)
+}
+

@@ -74,9 +74,11 @@ func main() {
 
 	admin.POST("/keys", adminH.CreateAPIKey)
 	admin.GET("/keys", adminH.ListAPIKeys)
+	admin.PUT("/keys/:id", adminH.UpdateAPIKey)
 	admin.DELETE("/keys/:id", adminH.RevokeAPIKey)
 
 	admin.GET("/usage", adminH.QueryUsage)
+	admin.GET("/usage/summary", adminH.GetUsageSummary)
 
 	admin.POST("/guardrails", adminH.CreateGuardrail)
 	admin.GET("/guardrails", adminH.ListGuardrails)

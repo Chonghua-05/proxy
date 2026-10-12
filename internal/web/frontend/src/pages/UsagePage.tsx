@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
+import { ChevronLeftIcon, ChevronRightIcon, BarChart3Icon, TrendingUpIcon, PieChartIcon } from 'lucide-react'
 
 import PageHeader from '@/components/PageHeader'
 import DismissibleAlert from '@/components/DismissibleAlert'
@@ -17,7 +17,16 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatCompact, formatDateTime } from '@/lib/format'
 import { useI18n } from '@/lib/i18n'
-import { queryUsage, listKeys, listProviders, type UsageRecord, type APIKey, type Provider } from '@/api/client'
+import {
+  queryUsage,
+  getUsageSummary,
+  listKeys,
+  listProviders,
+  type UsageRecord,
+  type UsageSummary,
+  type APIKey,
+  type Provider,
+} from '@/api/client'
 
 const ALL = 'all'
 
@@ -38,6 +47,7 @@ export default function UsagePage() {
   const { t } = useI18n()
   const [records, setRecords] = useState<UsageRecord[]>([])
   const [total, setTotal] = useState(0)
+  const [summary, setSummary] = useState<UsageSummary | null>(null)
   const [keys, setKeys] = useState<APIKey[]>([])
   const [providers, setProviders] = useState<Provider[]>([])
   const [loading, setLoading] = useState(true)
@@ -64,14 +74,22 @@ export default function UsagePage() {
         if (filterStart) params.start = new Date(filterStart).toISOString()
         if (filterEnd) params.end = new Date(filterEnd).toISOString()
 
-        const [result, k, p] = await Promise.all([
+        const summaryParams: Record<string, string> = {}
+        if (filterKeyId !== ALL) summaryParams.api_key_id = filterKeyId
+        if (filterProviderId !== ALL) summaryParams.provider_id = filterProviderId
+        if (filterStart) summaryParams.start = new Date(filterStart).toISOString()
+        if (filterEnd) summaryParams.end = new Date(filterEnd).toISOString()
+
+        const [result, sum, k, p] = await Promise.all([
           queryUsage(params),
+          getUsageSummary(summaryParams),
           listKeys(),
           listProviders(),
         ])
         if (stale) return
         setRecords(result.records || [])
         setTotal(result.total)
+        setSummary(sum)
         setKeys(k || [])
         setProviders(p || [])
       } catch (err: unknown) {
@@ -84,11 +102,6 @@ export default function UsagePage() {
   }, [page, filterKeyId, filterProviderId, filterStart, filterEnd])
 
   const totalPages = Math.max(1, Math.ceil(total / perPage))
-
-  // Compute page-level stats
-  const promptTotal = records.reduce((s, r) => s + r.prompt_tokens, 0)
-  const completionTotal = records.reduce((s, r) => s + r.completion_tokens, 0)
-  const allTotal = records.reduce((s, r) => s + r.total_tokens, 0)
 
   function keyName(id: string): string {
     return keys.find((k) => k.id === id)?.name || id.slice(0, 8)
@@ -105,6 +118,15 @@ export default function UsagePage() {
     setFilterEnd('')
     setPage(1)
   }
+
+  const timeline = summary?.timeline || []
+  const maxTokens = Math.max(1, ...timeline.map((tp) => tp.total_tokens))
+
+  const topModels = summary?.top_models || []
+  const maxModelTokens = Math.max(1, ...topModels.map((m) => m.total_tokens))
+
+  const topKeys = summary?.top_keys || []
+  const maxKeyTokens = Math.max(1, ...topKeys.map((k) => k.total_tokens))
 
   return (
     <div>
@@ -173,15 +195,120 @@ export default function UsagePage() {
         </CardContent>
       </Card>
 
-      {/* Stats for the current page of records */}
+      {/* Stats overall */}
       <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
-        <StatTile label={t('usage.statRequests')} value={total} />
-        <StatTile label={t('usage.statPrompt')} value={promptTotal} />
-        <StatTile label={t('usage.statCompletion')} value={completionTotal} />
-        <StatTile label={t('usage.statTotal')} value={allTotal} />
+        <StatTile label={t('usage.statRequests')} value={summary?.total_requests || total} />
+        <StatTile label={t('usage.statPrompt')} value={summary?.total_prompt || 0} />
+        <StatTile label={t('usage.statCompletion')} value={summary?.total_completion || 0} />
+        <StatTile label={t('usage.statTotal')} value={summary?.total_tokens || 0} />
       </div>
 
-      {/* Records */}
+      {/* Visual Analytics Charts Section */}
+      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {/* Timeline Bar Chart */}
+        <Card className="p-4 lg:col-span-2">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TrendingUpIcon className="size-4 text-brass" />
+              <h2 className="text-sm font-medium">{t('usage.timelineTitle')}</h2>
+            </div>
+            <span className="font-mono text-xs text-muted-foreground">
+              {timeline.length} {t('usage.requestsTrend')}
+            </span>
+          </div>
+
+          {timeline.length === 0 ? (
+            <div className="flex h-40 items-center justify-center font-mono text-xs text-muted-foreground">
+              {t('usage.noChartData')}
+            </div>
+          ) : (
+            <div className="flex h-44 items-end gap-1.5 pt-4 overflow-x-auto pb-2 border-b">
+              {timeline.map((tp, idx) => {
+                const heightPct = Math.max(8, Math.round((tp.total_tokens / maxTokens) * 100))
+                const shortTime = tp.timestamp.slice(5)
+                return (
+                  <div
+                    key={idx}
+                    className="group relative flex flex-1 min-w-[20px] flex-col items-center justify-end h-full"
+                  >
+                    <div className="absolute -top-10 z-10 hidden whitespace-nowrap rounded bg-popover px-2 py-1 font-mono text-[11px] shadow border text-popover-foreground group-hover:flex flex-col items-center">
+                      <span>{tp.timestamp}</span>
+                      <span>{tp.total_tokens.toLocaleString()} tokens ({tp.requests} reqs)</span>
+                    </div>
+                    <div
+                      style={{ height: `${heightPct}%` }}
+                      className="w-full rounded-xs bg-brass/80 transition-all group-hover:bg-brass"
+                    />
+                    <span className="mt-1 font-mono text-[9px] text-muted-foreground/70 -rotate-45 truncate max-w-[28px]">
+                      {shortTime}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </Card>
+
+        {/* Top Models & Top Keys Distribution */}
+        <Card className="p-4 flex flex-col justify-between">
+          <div>
+            <div className="mb-3 flex items-center gap-2">
+              <BarChart3Icon className="size-4 text-brass" />
+              <h2 className="text-sm font-medium">{t('usage.topModelsTitle')}</h2>
+            </div>
+            {topModels.length === 0 ? (
+              <p className="py-4 text-center font-mono text-xs text-muted-foreground">{t('usage.noChartData')}</p>
+            ) : (
+              <div className="space-y-2.5">
+                {topModels.slice(0, 5).map((m, idx) => {
+                  const pct = Math.round((m.total_tokens / maxModelTokens) * 100)
+                  return (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs font-mono">
+                        <span className="truncate max-w-[150px]" title={m.model}>{m.model}</span>
+                        <span className="text-muted-foreground">{formatCompact(m.total_tokens)}</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
+                        <div style={{ width: `${pct}%` }} className="h-full bg-foreground/80 rounded-full" />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 pt-3 border-t">
+            <div className="mb-2 flex items-center gap-2">
+              <PieChartIcon className="size-4 text-brass" />
+              <h2 className="text-sm font-medium">{t('usage.topKeysTitle')}</h2>
+            </div>
+            {topKeys.length === 0 ? (
+              <p className="py-2 text-center font-mono text-xs text-muted-foreground">{t('usage.noChartData')}</p>
+            ) : (
+              <div className="space-y-2">
+                {topKeys.slice(0, 3).map((k, idx) => {
+                  const pct = Math.round((k.total_tokens / maxKeyTokens) * 100)
+                  return (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs font-mono">
+                        <span className="truncate max-w-[150px]">{keyName(k.api_key_id)}</span>
+                        <span className="text-muted-foreground">{formatCompact(k.total_tokens)}</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
+                        <div style={{ width: `${pct}%` }} className="h-full bg-brass/90 rounded-full" />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {/* Detailed Request Logs */}
+      <p className="kicker mb-2 text-muted-foreground">{t('usage.recentLogs')}</p>
       <Card className="gap-0 py-0 overflow-hidden">
         <div className="overflow-x-auto">
           <Table>

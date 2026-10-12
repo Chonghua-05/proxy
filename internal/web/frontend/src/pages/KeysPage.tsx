@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, type FormEvent } from 'react'
-import { CopyIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { CopyIcon, PlusIcon, Trash2Icon, PencilIcon } from 'lucide-react'
 
 import PageHeader from '@/components/PageHeader'
 import DismissibleAlert from '@/components/DismissibleAlert'
@@ -27,7 +27,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDateTime } from '@/lib/format'
 import { useI18n } from '@/lib/i18n'
-import { listKeys, createKey, revokeKey, listProviders, type APIKey, type Provider } from '@/api/client'
+import { listKeys, createKey, updateKey, revokeKey, listProviders, type APIKey, type Provider } from '@/api/client'
 
 export default function KeysPage() {
   const { t } = useI18n()
@@ -38,12 +38,21 @@ export default function KeysPage() {
   const [flash, setFlash] = useState('')
   const [newKey, setNewKey] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editingKey, setEditingKey] = useState<APIKey | null>(null)
   const [revokeTarget, setRevokeTarget] = useState<APIKey | null>(null)
 
+  // Form states for create
   const [name, setName] = useState('')
   const [providerId, setProviderId] = useState('')
   const [rpm, setRpm] = useState('60')
   const [submitting, setSubmitting] = useState(false)
+
+  // Form states for edit
+  const [editName, setEditName] = useState('')
+  const [editProviderId, setEditProviderId] = useState('')
+  const [editRpm, setEditRpm] = useState('60')
+  const [editSubmitting, setEditSubmitting] = useState(false)
 
   const [reloadTick, setReloadTick] = useState(0)
   const reload = useCallback(() => setReloadTick((t) => t + 1), [])
@@ -89,6 +98,40 @@ export default function KeysPage() {
       setError(err instanceof Error ? err.message : 'Failed to create key')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  function startEdit(k: APIKey) {
+    setEditingKey(k)
+    setEditName(k.name)
+    setEditProviderId(k.provider_id)
+    setEditRpm(String(k.rate_limit_rpm))
+    setEditModalOpen(true)
+  }
+
+  async function handleUpdate(e: FormEvent) {
+    e.preventDefault()
+    if (!editingKey) return
+    if (!editName || !editProviderId) {
+      setError(t('keys.requiredFields'))
+      return
+    }
+    setEditSubmitting(true)
+    setError('')
+    try {
+      await updateKey(editingKey.id, {
+        name: editName,
+        provider_id: editProviderId,
+        rate_limit_rpm: parseInt(editRpm) || 60,
+      })
+      setFlash(t('keys.updatedSuccess'))
+      setEditModalOpen(false)
+      setEditingKey(null)
+      reload()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to update key')
+    } finally {
+      setEditSubmitting(false)
     }
   }
 
@@ -156,7 +199,7 @@ export default function KeysPage() {
                 <TableHead className="text-right">RPM</TableHead>
                 <TableHead>{t('keys.status')}</TableHead>
                 <TableHead>{t('common.created')}</TableHead>
-                <TableHead className="w-12" />
+                <TableHead className="w-20 text-right">{t('common.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -192,15 +235,26 @@ export default function KeysPage() {
                     <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(k.created_at)}</TableCell>
                     <TableCell className="py-1 text-right whitespace-nowrap">
                       {!k.revoked_at && (
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={`Revoke key ${k.name}`}
-                          className="text-muted-foreground hover:text-destructive"
-                          onClick={() => setRevokeTarget(k)}
-                        >
-                          <Trash2Icon className="size-4" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={`${t('keys.edit')} ${k.name}`}
+                            className="text-muted-foreground hover:text-foreground"
+                            onClick={() => startEdit(k)}
+                          >
+                            <PencilIcon className="size-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={`Revoke key ${k.name}`}
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => setRevokeTarget(k)}
+                          >
+                            <Trash2Icon className="size-3.5" />
+                          </Button>
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>
@@ -211,6 +265,7 @@ export default function KeysPage() {
         </div>
       </Card>
 
+      {/* Create Modal */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-lg">
           <DialogHeader>
@@ -243,6 +298,45 @@ export default function KeysPage() {
             <DialogFooter>
               <Button type="submit" disabled={submitting}>
                 {submitting ? t('common.submitting') : t('keys.create')}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Modal */}
+      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t('keys.editModalTitle')}</DialogTitle>
+            <DialogDescription>{editingKey ? editingKey.name : ''}</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdate} className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-key-name">{t('common.name')}</Label>
+              <Input id="edit-key-name" value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-key-provider">{t('keys.provider')}</Label>
+              <Select value={editProviderId} onValueChange={setEditProviderId}>
+                <SelectTrigger id="edit-key-provider" className="w-full">
+                  <SelectValue placeholder={t('keys.selectProvider')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {providers.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-key-rpm">{t('keys.rateLimit')}</Label>
+              <Input id="edit-key-rpm" type="number" value={editRpm} onChange={(e) => setEditRpm(e.target.value)} />
+              <p className="text-xs text-muted-foreground">{t('keys.rpmHint')}</p>
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={editSubmitting}>
+                {editSubmitting ? t('common.submitting') : t('common.save')}
               </Button>
             </DialogFooter>
           </form>

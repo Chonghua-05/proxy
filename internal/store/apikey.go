@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -97,6 +98,56 @@ func (s *APIKeyStore) Revoke(id string) error {
 	}
 	return nil
 }
+
+func (s *APIKeyStore) Update(id string, name *string, providerID *string, rateLimitRPM *int) (*models.APIKey, error) {
+	var sets []string
+	var args []interface{}
+
+	if name != nil {
+		sets = append(sets, "name = ?")
+		args = append(args, *name)
+	}
+	if providerID != nil {
+		sets = append(sets, "provider_id = ?")
+		args = append(args, *providerID)
+	}
+	if rateLimitRPM != nil {
+		sets = append(sets, "rate_limit_rpm = ?")
+		args = append(args, *rateLimitRPM)
+	}
+
+	if len(sets) == 0 {
+		return s.GetByID(id)
+	}
+
+	args = append(args, id)
+	query := fmt.Sprintf("UPDATE api_keys SET %s WHERE id = ?", strings.Join(sets, ", "))
+	res, err := s.db.Exec(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("update api key: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return nil, sql.ErrNoRows
+	}
+
+	return s.GetByID(id)
+}
+
+func (s *APIKeyStore) GetByID(id string) (*models.APIKey, error) {
+	var k models.APIKey
+	err := s.db.QueryRow(
+		`SELECT id, name, key_hash, provider_id, rate_limit_rpm, created_at, revoked_at FROM api_keys WHERE id = ?`, id,
+	).Scan(&k.ID, &k.Name, &k.KeyHash, &k.ProviderID, &k.RateLimitRPM, &k.CreatedAt, &k.RevokedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &k, nil
+}
+
 
 // generateKey creates a "llmp-" prefixed random key.
 func generateKey() (string, error) {

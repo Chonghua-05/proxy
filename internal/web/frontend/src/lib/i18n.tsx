@@ -72,6 +72,7 @@ export const translations = {
     'keys.title': 'API keys',
     'keys.description': 'Keys clients use to call the proxy. Each key maps to one provider.',
     'keys.create': 'Create key',
+    'keys.edit': 'Edit key',
     'keys.empty': 'No API keys created yet.',
     'keys.rateLimit': 'Rate limit (RPM)',
     'keys.provider': 'Provider',
@@ -80,6 +81,7 @@ export const translations = {
     'keys.active': 'Active',
     'keys.revoked': 'Revoked',
     'keys.modalTitle': 'Create API key',
+    'keys.editModalTitle': 'Edit API key',
     'keys.modalDescription': 'Issue a new proxy key for client applications.',
     'keys.namePlaceholder': 'e.g. Mobile App Client',
     'keys.rpmPlaceholder': '60',
@@ -87,6 +89,7 @@ export const translations = {
     'keys.requiredFields': 'Name and Provider are required.',
     'keys.createdAlert': 'Key created. Copy it now — it will not be displayed again.',
     'keys.revokedSuccess': 'Key revoked.',
+    'keys.updatedSuccess': 'Key updated successfully.',
     'keys.revokeConfirmTitle': 'Revoke API key',
     'keys.revokeConfirmDesc': 'Are you sure you want to revoke {name}? Clients using this key will immediately receive 401 Unauthorized.',
 
@@ -105,6 +108,12 @@ export const translations = {
     'usage.statRequests': 'Total requests',
     'usage.model': 'Model',
     'usage.timestamp': 'Timestamp',
+    'usage.timelineTitle': 'Token & Request Trends',
+    'usage.topModelsTitle': 'Top Models Consumption',
+    'usage.topKeysTitle': 'Top Active API Keys',
+    'usage.recentLogs': 'Detailed Request Logs',
+    'usage.requestsTrend': 'request points',
+    'usage.noChartData': 'Not enough data points to plot.',
 
     // Guardrails Page
     'guardrails.title': 'Guardrails',
@@ -218,6 +227,7 @@ export const translations = {
     'keys.title': 'API 密钥',
     'keys.description': '客户端调用代理时使用的密钥。每个密钥绑定一个提供商端点。',
     'keys.create': '创建密钥',
+    'keys.edit': '编辑密钥',
     'keys.empty': '暂未创建任何 API 密钥。',
     'keys.rateLimit': '速率限制 (RPM)',
     'keys.provider': '绑定提供商',
@@ -226,6 +236,7 @@ export const translations = {
     'keys.active': '正常',
     'keys.revoked': '已吊销',
     'keys.modalTitle': '创建 API 密钥',
+    'keys.editModalTitle': '编辑 API 密钥',
     'keys.modalDescription': '为下游业务应用签发带独立限流规则的代理调用密钥。',
     'keys.namePlaceholder': '例如：内部前端应用、移动端客户端',
     'keys.rpmPlaceholder': '60',
@@ -233,6 +244,7 @@ export const translations = {
     'keys.requiredFields': '名称和提供商为必填项。',
     'keys.createdAlert': '密钥创建成功！请立即复制保存，关闭后将无法再次查看该密钥。',
     'keys.revokedSuccess': '密钥已吊销。',
+    'keys.updatedSuccess': '密钥更新成功。',
     'keys.revokeConfirmTitle': '确认吊销密钥',
     'keys.revokeConfirmDesc': '确定要吊销密钥「{name}」吗？使用该密钥的请求将立即被拒（401 Unauthorized）。',
 
@@ -251,6 +263,12 @@ export const translations = {
     'usage.statRequests': '总请求次数',
     'usage.model': '模型',
     'usage.timestamp': '请求时间',
+    'usage.timelineTitle': 'Token 消耗与请求趋势',
+    'usage.topModelsTitle': '模型消耗分布',
+    'usage.topKeysTitle': 'API 密钥消耗排行',
+    'usage.recentLogs': '请求调用明细',
+    'usage.requestsTrend': '个采样时段',
+    'usage.noChartData': '暂无足够数据展示趋势图。',
 
     // Guardrails Page
     'guardrails.title': '安全护栏',

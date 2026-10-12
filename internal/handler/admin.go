@@ -160,7 +160,67 @@ func (h *AdminHandler) RevokeAPIKey(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+type updateAPIKeyReq struct {
+	Name         *string `json:"name"`
+	ProviderID   *string `json:"provider_id"`
+	RateLimitRPM *int    `json:"rate_limit_rpm"`
+}
+
+func (h *AdminHandler) UpdateAPIKey(c echo.Context) error {
+	var req updateAPIKeyReq
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	if req.ProviderID != nil && *req.ProviderID != "" {
+		p, err := h.providers.GetByID(*req.ProviderID)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		}
+		if p == nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "provider not found")
+		}
+	}
+
+	k, err := h.keys.Update(c.Param("id"), req.Name, req.ProviderID, req.RateLimitRPM)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return echo.NewHTTPError(http.StatusNotFound, "api key not found")
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, k)
+}
+
 // ── Usage ──────────────────────────────────────────────────────────────
+
+func (h *AdminHandler) GetUsageSummary(c echo.Context) error {
+	q := store.UsageQuery{
+		APIKeyID:   c.QueryParam("api_key_id"),
+		ProviderID: c.QueryParam("provider_id"),
+	}
+
+	if s := c.QueryParam("start"); s != "" {
+		t, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid start time")
+		}
+		q.Start = &t
+	}
+	if s := c.QueryParam("end"); s != "" {
+		t, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid end time")
+		}
+		q.End = &t
+	}
+
+	summary, err := h.usage.GetSummary(q)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, summary)
+}
 
 func (h *AdminHandler) QueryUsage(c echo.Context) error {
 	q := store.UsageQuery{
