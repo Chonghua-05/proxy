@@ -3,6 +3,7 @@ import { useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
 import LoginPage from './pages/LoginPage'
 import ProvidersPage from './pages/ProvidersPage'
+import QuotasPage from './pages/QuotasPage'
 import KeysPage from './pages/KeysPage'
 import UsagePage from './pages/UsagePage'
 import GuardrailsPage from './pages/GuardrailsPage'
@@ -28,6 +29,7 @@ export default function App() {
       >
         <Route index element={<Navigate to="providers" replace />} />
         <Route path="providers" element={<ProvidersPage />} />
+        <Route path="quotas" element={<QuotasPage />} />
         <Route path="keys" element={<KeysPage />} />
         <Route path="usage" element={<UsagePage />} />
         <Route path="guardrails" element={<GuardrailsPage />} />

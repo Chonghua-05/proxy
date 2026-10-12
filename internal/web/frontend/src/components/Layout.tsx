@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   ServerIcon,
+  GaugeIcon,
   KeyRoundIcon,
   ChartNoAxesColumnIcon,
   ShieldIcon,
@@ -32,10 +33,11 @@ interface NavDef {
 
 const NAV_ITEMS: NavDef[] = [
   { path: 'providers', index: '01', labelKey: 'nav.providers', icon: ServerIcon },
-  { path: 'keys', index: '02', labelKey: 'nav.keys', icon: KeyRoundIcon },
-  { path: 'usage', index: '03', labelKey: 'nav.usage', icon: ChartNoAxesColumnIcon },
-  { path: 'guardrails', index: '04', labelKey: 'nav.guardrails', icon: ShieldIcon },
-  { path: 'playground', index: '05', labelKey: 'nav.playground', icon: TerminalIcon },
+  { path: 'quotas', index: '02', labelKey: 'nav.quotas', icon: GaugeIcon },
+  { path: 'keys', index: '03', labelKey: 'nav.keys', icon: KeyRoundIcon },
+  { path: 'usage', index: '04', labelKey: 'nav.usage', icon: ChartNoAxesColumnIcon },
+  { path: 'guardrails', index: '05', labelKey: 'nav.guardrails', icon: ShieldIcon },
+  { path: 'playground', index: '06', labelKey: 'nav.playground', icon: TerminalIcon },
 ]
 
 function ThemeToggle() {

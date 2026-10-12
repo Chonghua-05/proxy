@@ -4,8 +4,11 @@ import (
 	"database/sql"
 	"net/http"
 	"regexp"
+	"sync"
 	"time"
 
+	"github.com/lab34/llm-proxy/internal/models"
+	"github.com/lab34/llm-proxy/internal/quota"
 	"github.com/lab34/llm-proxy/internal/store"
 	"github.com/labstack/echo/v4"
 )
@@ -16,18 +19,28 @@ type AdminHandler struct {
 	usage           *store.UsageStore
 	guardrails      *store.GuardrailStore
 	guardrailEvents *store.GuardrailEventStore
+	quotas          *quota.Manager
 }
 
 func NewAdminHandler(p *store.ProviderStore, k *store.APIKeyStore, u *store.UsageStore, g *store.GuardrailStore, ge *store.GuardrailEventStore) *AdminHandler {
-	return &AdminHandler{providers: p, keys: k, usage: u, guardrails: g, guardrailEvents: ge}
+	return &AdminHandler{
+		providers:       p,
+		keys:            k,
+		usage:           u,
+		guardrails:      g,
+		guardrailEvents: ge,
+		quotas:          quota.NewManager(),
+	}
 }
 
 // ── Providers ──────────────────────────────────────────────────────────
 
 type createProviderReq struct {
-	Name    string `json:"name"`
-	BaseURL string `json:"base_url"`
-	APIKey  string `json:"api_key"`
+	Name        string  `json:"name"`
+	BaseURL     string  `json:"base_url"`
+	APIKey      string  `json:"api_key"`
+	QuotaType   *string `json:"quota_type"`
+	QuotaConfig *string `json:"quota_config"`
 }
 
 func (h *AdminHandler) CreateProvider(c echo.Context) error {
@@ -38,7 +51,15 @@ func (h *AdminHandler) CreateProvider(c echo.Context) error {
 	if req.Name == "" || req.BaseURL == "" || req.APIKey == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "name, base_url, and api_key are required")
 	}
-	p, err := h.providers.Create(req.Name, req.BaseURL, req.APIKey)
+	qt := "none"
+	if req.QuotaType != nil {
+		qt = *req.QuotaType
+	}
+	qc := ""
+	if req.QuotaConfig != nil {
+		qc = *req.QuotaConfig
+	}
+	p, err := h.providers.CreateWithQuota(req.Name, req.BaseURL, req.APIKey, qt, qc)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
@@ -68,9 +89,11 @@ func (h *AdminHandler) GetProvider(c echo.Context) error {
 }
 
 type updateProviderReq struct {
-	Name    *string `json:"name"`
-	BaseURL *string `json:"base_url"`
-	APIKey  *string `json:"api_key"`
+	Name        *string `json:"name"`
+	BaseURL     *string `json:"base_url"`
+	APIKey      *string `json:"api_key"`
+	QuotaType   *string `json:"quota_type"`
+	QuotaConfig *string `json:"quota_config"`
 }
 
 func (h *AdminHandler) UpdateProvider(c echo.Context) error {
@@ -78,7 +101,7 @@ func (h *AdminHandler) UpdateProvider(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	p, err := h.providers.Update(c.Param("id"), req.Name, req.BaseURL, req.APIKey)
+	p, err := h.providers.UpdateWithQuota(c.Param("id"), req.Name, req.BaseURL, req.APIKey, req.QuotaType, req.QuotaConfig)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
@@ -86,6 +109,45 @@ func (h *AdminHandler) UpdateProvider(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "provider not found")
 	}
 	return c.JSON(http.StatusOK, p)
+}
+
+func (h *AdminHandler) GetProviderQuota(c echo.Context) error {
+	p, err := h.providers.GetByID(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	if p == nil {
+		return echo.NewHTTPError(http.StatusNotFound, "provider not found")
+	}
+	res, err := h.quotas.Fetch(c.Request().Context(), p)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+func (h *AdminHandler) ListQuotas(c echo.Context) error {
+	providers, err := h.providers.List()
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	results := make([]*quota.Result, len(providers))
+	var wg sync.WaitGroup
+	ctx := c.Request().Context()
+
+	for i, p := range providers {
+		wg.Add(1)
+		go func(idx int, prov models.Provider) {
+			defer wg.Done()
+			provCopy := prov
+			res, _ := h.quotas.Fetch(ctx, &provCopy)
+			results[idx] = res
+		}(i, p)
+	}
+	wg.Wait()
+
+	return c.JSON(http.StatusOK, results)
 }
 
 func (h *AdminHandler) DeleteProvider(c echo.Context) error {

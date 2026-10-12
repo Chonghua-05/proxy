@@ -18,17 +18,26 @@ func NewProviderStore(db *sql.DB) *ProviderStore {
 }
 
 func (s *ProviderStore) Create(name, baseURL, apiKey string) (*models.Provider, error) {
+	return s.CreateWithQuota(name, baseURL, apiKey, "none", "")
+}
+
+func (s *ProviderStore) CreateWithQuota(name, baseURL, apiKey, quotaType, quotaConfig string) (*models.Provider, error) {
+	if quotaType == "" {
+		quotaType = "none"
+	}
 	p := &models.Provider{
-		ID:        uuid.New().String(),
-		Name:      name,
-		BaseURL:   baseURL,
-		APIKey:    apiKey,
-		CreatedAt: time.Now().UTC(),
-		UpdatedAt: time.Now().UTC(),
+		ID:          uuid.New().String(),
+		Name:        name,
+		BaseURL:     baseURL,
+		APIKey:      apiKey,
+		QuotaType:   quotaType,
+		QuotaConfig: quotaConfig,
+		CreatedAt:   time.Now().UTC(),
+		UpdatedAt:   time.Now().UTC(),
 	}
 	_, err := s.db.Exec(
-		`INSERT INTO providers (id, name, base_url, api_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
-		p.ID, p.Name, p.BaseURL, p.APIKey, p.CreatedAt, p.UpdatedAt,
+		`INSERT INTO providers (id, name, base_url, api_key, quota_type, quota_config, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.ID, p.Name, p.BaseURL, p.APIKey, p.QuotaType, p.QuotaConfig, p.CreatedAt, p.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert provider: %w", err)
@@ -37,7 +46,7 @@ func (s *ProviderStore) Create(name, baseURL, apiKey string) (*models.Provider, 
 }
 
 func (s *ProviderStore) List() ([]models.Provider, error) {
-	rows, err := s.db.Query(`SELECT id, name, base_url, api_key, created_at, updated_at FROM providers ORDER BY created_at DESC`)
+	rows, err := s.db.Query(`SELECT id, name, base_url, api_key, quota_type, quota_config, created_at, updated_at FROM providers ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +55,7 @@ func (s *ProviderStore) List() ([]models.Provider, error) {
 	var out []models.Provider
 	for rows.Next() {
 		var p models.Provider
-		if err := rows.Scan(&p.ID, &p.Name, &p.BaseURL, &p.APIKey, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.BaseURL, &p.APIKey, &p.QuotaType, &p.QuotaConfig, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -57,8 +66,8 @@ func (s *ProviderStore) List() ([]models.Provider, error) {
 func (s *ProviderStore) GetByID(id string) (*models.Provider, error) {
 	var p models.Provider
 	err := s.db.QueryRow(
-		`SELECT id, name, base_url, api_key, created_at, updated_at FROM providers WHERE id = ?`, id,
-	).Scan(&p.ID, &p.Name, &p.BaseURL, &p.APIKey, &p.CreatedAt, &p.UpdatedAt)
+		`SELECT id, name, base_url, api_key, quota_type, quota_config, created_at, updated_at FROM providers WHERE id = ?`, id,
+	).Scan(&p.ID, &p.Name, &p.BaseURL, &p.APIKey, &p.QuotaType, &p.QuotaConfig, &p.CreatedAt, &p.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -69,6 +78,10 @@ func (s *ProviderStore) GetByID(id string) (*models.Provider, error) {
 }
 
 func (s *ProviderStore) Update(id string, name, baseURL, apiKey *string) (*models.Provider, error) {
+	return s.UpdateWithQuota(id, name, baseURL, apiKey, nil, nil)
+}
+
+func (s *ProviderStore) UpdateWithQuota(id string, name, baseURL, apiKey, quotaType, quotaConfig *string) (*models.Provider, error) {
 	p, err := s.GetByID(id)
 	if err != nil || p == nil {
 		return p, err
@@ -82,11 +95,17 @@ func (s *ProviderStore) Update(id string, name, baseURL, apiKey *string) (*model
 	if apiKey != nil {
 		p.APIKey = *apiKey
 	}
+	if quotaType != nil {
+		p.QuotaType = *quotaType
+	}
+	if quotaConfig != nil {
+		p.QuotaConfig = *quotaConfig
+	}
 	p.UpdatedAt = time.Now().UTC()
 
 	_, err = s.db.Exec(
-		`UPDATE providers SET name=?, base_url=?, api_key=?, updated_at=? WHERE id=?`,
-		p.Name, p.BaseURL, p.APIKey, p.UpdatedAt, p.ID,
+		`UPDATE providers SET name=?, base_url=?, api_key=?, quota_type=?, quota_config=?, updated_at=? WHERE id=?`,
+		p.Name, p.BaseURL, p.APIKey, p.QuotaType, p.QuotaConfig, p.UpdatedAt, p.ID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("update provider: %w", err)

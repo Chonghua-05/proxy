@@ -42,6 +42,8 @@ export interface Provider {
   id: string
   name: string
   base_url: string
+  quota_type?: string
+  quota_config?: string
   created_at: string
   updated_at: string
 }
@@ -50,12 +52,62 @@ export function listProviders(): Promise<Provider[]> {
   return request('/providers')
 }
 
-export function createProvider(data: { name: string; base_url: string; api_key: string }): Promise<Provider> {
+export function createProvider(data: {
+  name: string
+  base_url: string
+  api_key: string
+  quota_type?: string
+  quota_config?: string
+}): Promise<Provider> {
   return request('/providers', { method: 'POST', body: JSON.stringify(data) })
+}
+
+export function updateProvider(
+  id: string,
+  data: {
+    name?: string
+    base_url?: string
+    api_key?: string
+    quota_type?: string
+    quota_config?: string
+  },
+): Promise<Provider> {
+  return request(`/providers/${id}`, { method: 'PUT', body: JSON.stringify(data) })
 }
 
 export function deleteProvider(id: string): Promise<void> {
   return request(`/providers/${id}`, { method: 'DELETE' })
+}
+
+// ── Quota ───────────────────────────────────────────────────────────────
+
+export interface QuotaBucket {
+  model_id: string
+  remaining_fraction?: number
+  remaining_percent?: number
+  reset_time?: string
+  reset_time_formatted?: string
+}
+
+export interface QuotaResult {
+  provider_id: string
+  provider_name: string
+  quota_type: string
+  account?: string
+  status: 'ok' | 'warning' | 'exhausted' | 'error' | 'unsupported'
+  message?: string
+  balance?: number
+  currency?: string
+  buckets?: QuotaBucket[]
+  updated_at: string
+}
+
+export function getProviderQuota(id: string): Promise<QuotaResult> {
+  return request(`/providers/${id}/quota`)
+}
+
+export function listQuotas(): Promise<QuotaResult[]> {
+  return request('/quotas')
 }
 
 // ── API Keys ───────────────────────────────────────────────────────────

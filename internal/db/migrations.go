@@ -6,12 +6,14 @@ import "database/sql"
 func migrate(db *sql.DB) error {
 	stmts := []string{
 		`CREATE TABLE IF NOT EXISTS providers (
-			id         TEXT PRIMARY KEY,
-			name       TEXT NOT NULL UNIQUE,
-			base_url   TEXT NOT NULL,
-			api_key    TEXT NOT NULL,
-			created_at DATETIME NOT NULL DEFAULT (datetime('now')),
-			updated_at DATETIME NOT NULL DEFAULT (datetime('now'))
+			id           TEXT PRIMARY KEY,
+			name         TEXT NOT NULL UNIQUE,
+			base_url     TEXT NOT NULL,
+			api_key      TEXT NOT NULL,
+			quota_type   TEXT NOT NULL DEFAULT 'none',
+			quota_config TEXT NOT NULL DEFAULT '',
+			created_at   DATETIME NOT NULL DEFAULT (datetime('now')),
+			updated_at   DATETIME NOT NULL DEFAULT (datetime('now'))
 		)`,
 
 		`CREATE TABLE IF NOT EXISTS api_keys (
@@ -79,7 +81,49 @@ func migrate(db *sql.DB) error {
 	if err := migrateGuardrailEventsCascade(db); err != nil {
 		return err
 	}
+	if err := migrateProviderQuota(db); err != nil {
+		return err
+	}
 
+	return nil
+}
+
+// migrateProviderQuota adds quota_type and quota_config columns to providers if they do not exist.
+func migrateProviderQuota(db *sql.DB) error {
+	rows, err := db.Query(`PRAGMA table_info(providers)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	hasQuotaType := false
+	hasQuotaConfig := false
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dfltValue interface{}
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		if name == "quota_type" {
+			hasQuotaType = true
+		}
+		if name == "quota_config" {
+			hasQuotaConfig = true
+		}
+	}
+
+	if !hasQuotaType {
+		if _, err := db.Exec(`ALTER TABLE providers ADD COLUMN quota_type TEXT NOT NULL DEFAULT 'none'`); err != nil {
+			return err
+		}
+	}
+	if !hasQuotaConfig {
+		if _, err := db.Exec(`ALTER TABLE providers ADD COLUMN quota_config TEXT NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

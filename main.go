@@ -71,6 +71,8 @@ func main() {
 	admin.GET("/providers/:id", adminH.GetProvider)
 	admin.PUT("/providers/:id", adminH.UpdateProvider)
 	admin.DELETE("/providers/:id", adminH.DeleteProvider)
+	admin.GET("/providers/:id/quota", adminH.GetProviderQuota)
+	admin.GET("/quotas", adminH.ListQuotas)
 
 	admin.POST("/keys", adminH.CreateAPIKey)
 	admin.GET("/keys", adminH.ListAPIKeys)

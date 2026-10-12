@@ -479,3 +479,37 @@ func TestGetUsageSummary_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
+func TestGetProviderQuota_Success(t *testing.T) {
+	h, ps, _, _ := setupAdminHandler(t)
+	e := echo.New()
+
+	p, err := ps.CreateWithQuota("test-prov-quota", "https://test.com", "key", "none", "")
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/providers/"+p.ID+"/quota", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(p.ID)
+
+	err = h.GetProviderQuota(c)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestListQuotas_Success(t *testing.T) {
+	h, ps, _, _ := setupAdminHandler(t)
+	e := echo.New()
+
+	_, err := ps.CreateWithQuota("test-prov-1", "https://test.com", "key", "none", "")
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/quotas", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err = h.ListQuotas(c)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+

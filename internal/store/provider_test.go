@@ -112,12 +112,16 @@ func TestProviderStore_Update_PartialFields(t *testing.T) {
 	require.NoError(t, err)
 
 	newName := "updated"
-	updated, err := s.Update(created.ID, &newName, nil, nil)
+	newQuotaType := "antigravity"
+	newQuotaConfig := `{"project":"test"}`
+	updated, err := s.UpdateWithQuota(created.ID, &newName, nil, nil, &newQuotaType, &newQuotaConfig)
 	require.NoError(t, err)
 	require.NotNil(t, updated)
 	assert.Equal(t, "updated", updated.Name)
 	assert.Equal(t, "https://orig.com", updated.BaseURL) // unchanged
 	assert.Equal(t, "key1", updated.APIKey)              // unchanged
+	assert.Equal(t, "antigravity", updated.QuotaType)
+	assert.Equal(t, `{"project":"test"}`, updated.QuotaConfig)
 }
 
 func TestProviderStore_Update_NotFound(t *testing.T) {

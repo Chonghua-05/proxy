@@ -4,12 +4,14 @@ import "time"
 
 // Provider represents an upstream LLM provider configuration.
 type Provider struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	BaseURL   string    `json:"base_url"`
-	APIKey    string    `json:"-"` // never serialised to clients
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	BaseURL     string    `json:"base_url"`
+	APIKey      string    `json:"-"` // never serialised to clients
+	QuotaType   string    `json:"quota_type"`
+	QuotaConfig string    `json:"quota_config,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // APIKey represents a proxy API key issued to a client.
