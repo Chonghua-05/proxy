@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ChevronLeftIcon, ChevronRightIcon, BarChart3Icon, TrendingUpIcon, PieChartIcon, RefreshCwIcon } from 'lucide-react'
+import { ChevronLeftIcon, ChevronRightIcon, TrendingUpIcon, BarChart3Icon, PieChartIcon, RefreshCwIcon } from 'lucide-react'
 
 import PageHeader from '@/components/PageHeader'
 import DismissibleAlert from '@/components/DismissibleAlert'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -30,16 +29,14 @@ import {
 
 const ALL = 'all'
 
-function StatTile({ label, value }: { label: string; value: number }) {
+function MetricItem({ label, value }: { label: string; value: number }) {
   return (
-    <Card className="gap-1.5 py-3 sm:py-4">
-      <CardContent className="px-3 sm:px-4">
-        <p className="kicker text-muted-foreground truncate">{label}</p>
-        <p className="mt-1 font-mono text-xl sm:text-2xl font-medium" title={value.toLocaleString()}>
-          {formatCompact(value)}
-        </p>
-      </CardContent>
-    </Card>
+    <div className="flex flex-col py-1">
+      <span className="kicker text-muted-foreground/80">{label}</span>
+      <span className="mt-1 font-mono text-2xl font-medium tracking-tight" title={value.toLocaleString()}>
+        {formatCompact(value)}
+      </span>
+    </div>
   )
 }
 
@@ -139,18 +136,18 @@ export default function UsagePage() {
   const maxKeyTokens = Math.max(1, ...topKeys.map((k) => k.total_tokens))
 
   return (
-    <div>
+    <div className="space-y-8">
       <PageHeader
         index="03"
         title={t('usage.title')}
         description={t('usage.description')}
         actions={
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={reload}
             disabled={refreshing || loading}
-            className="gap-1.5"
+            className="gap-1.5 border border-border/80"
             aria-label={t('common.refresh')}
           >
             <RefreshCwIcon className={`size-3.5 ${refreshing ? 'animate-spin' : ''}`} />
@@ -159,78 +156,76 @@ export default function UsagePage() {
         }
       />
 
-      {error && <DismissibleAlert variant="destructive" className="mb-4" onClose={() => setError('')}>{error}</DismissibleAlert>}
+      {error && <DismissibleAlert variant="destructive" onClose={() => setError('')}>{error}</DismissibleAlert>}
 
-      {/* Filters */}
-      <Card className="mb-4 py-4">
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:flex lg:flex-wrap items-end gap-3 sm:gap-4 px-3 sm:px-4">
-          <div className="grid gap-1.5 w-full lg:w-48">
-            <Label htmlFor="filter-key">{t('usage.filterKey')}</Label>
-            <Select value={filterKeyId} onValueChange={(v) => { setFilterKeyId(v); setPage(1) }}>
-              <SelectTrigger id="filter-key" size="sm" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>{t('common.all')}</SelectItem>
-                {keys.map((k) => (
-                  <SelectItem key={k.id} value={k.id}>{k.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-1.5 w-full lg:w-48">
-            <Label htmlFor="filter-provider">{t('usage.filterProvider')}</Label>
-            <Select value={filterProviderId} onValueChange={(v) => { setFilterProviderId(v); setPage(1) }}>
-              <SelectTrigger id="filter-provider" size="sm" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>{t('common.all')}</SelectItem>
-                {providers.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-1.5 w-full lg:w-44">
-            <Label htmlFor="filter-start">{t('usage.filterStart')}</Label>
-            <Input
-              id="filter-start"
-              type="datetime-local"
-              className="h-8 font-mono text-xs w-full"
-              value={filterStart}
-              onChange={(e) => { setFilterStart(e.target.value); setPage(1) }}
-            />
-          </div>
-          <div className="grid gap-1.5 w-full lg:w-44">
-            <Label htmlFor="filter-end">{t('usage.filterEnd')}</Label>
-            <Input
-              id="filter-end"
-              type="datetime-local"
-              className="h-8 font-mono text-xs w-full"
-              value={filterEnd}
-              onChange={(e) => { setFilterEnd(e.target.value); setPage(1) }}
-            />
-          </div>
-          <Button size="sm" variant="ghost" onClick={clearFilters} className="w-full sm:w-auto mt-2 sm:mt-0">
-            {t('usage.clearFilters')}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Stats overall */}
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
-        <StatTile label={t('usage.statRequests')} value={summary?.total_requests || total} />
-        <StatTile label={t('usage.statPrompt')} value={summary?.total_prompt || 0} />
-        <StatTile label={t('usage.statCompletion')} value={summary?.total_completion || 0} />
-        <StatTile label={t('usage.statTotal')} value={summary?.total_tokens || 0} />
+      {/* 无卡片指标平铺栏 */}
+      <div className="grid grid-cols-2 gap-4 pb-6 border-b sm:grid-cols-4">
+        <MetricItem label={t('usage.statRequests')} value={summary?.total_requests || total} />
+        <MetricItem label={t('usage.statPrompt')} value={summary?.total_prompt || 0} />
+        <MetricItem label={t('usage.statCompletion')} value={summary?.total_completion || 0} />
+        <MetricItem label={t('usage.statTotal')} value={summary?.total_tokens || 0} />
       </div>
 
-      {/* Visual Analytics Charts Section */}
-      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Timeline Bar Chart */}
-        <Card className="p-4 lg:col-span-2">
-          <div className="mb-3 flex items-center justify-between">
+      {/* 筛选栏：直接融于版面，无卡片外壳 */}
+      <div className="flex flex-wrap items-end gap-3 pb-6 border-b sm:gap-4">
+        <div className="grid gap-1.5 w-full sm:w-44">
+          <Label htmlFor="filter-key" className="text-xs text-muted-foreground">{t('usage.filterKey')}</Label>
+          <Select value={filterKeyId} onValueChange={(v) => { setFilterKeyId(v); setPage(1) }}>
+            <SelectTrigger id="filter-key" size="sm" className="w-full bg-transparent">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>{t('common.all')}</SelectItem>
+              {keys.map((k) => (
+                <SelectItem key={k.id} value={k.id}>{k.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-1.5 w-full sm:w-44">
+          <Label htmlFor="filter-provider" className="text-xs text-muted-foreground">{t('usage.filterProvider')}</Label>
+          <Select value={filterProviderId} onValueChange={(v) => { setFilterProviderId(v); setPage(1) }}>
+            <SelectTrigger id="filter-provider" size="sm" className="w-full bg-transparent">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>{t('common.all')}</SelectItem>
+              {providers.map((p) => (
+                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-1.5 w-full sm:w-40">
+          <Label htmlFor="filter-start" className="text-xs text-muted-foreground">{t('usage.filterStart')}</Label>
+          <Input
+            id="filter-start"
+            type="datetime-local"
+            className="h-8 font-mono text-xs w-full bg-transparent"
+            value={filterStart}
+            onChange={(e) => { setFilterStart(e.target.value); setPage(1) }}
+          />
+        </div>
+        <div className="grid gap-1.5 w-full sm:w-40">
+          <Label htmlFor="filter-end" className="text-xs text-muted-foreground">{t('usage.filterEnd')}</Label>
+          <Input
+            id="filter-end"
+            type="datetime-local"
+            className="h-8 font-mono text-xs w-full bg-transparent"
+            value={filterEnd}
+            onChange={(e) => { setFilterEnd(e.target.value); setPage(1) }}
+          />
+        </div>
+        <Button size="sm" variant="ghost" onClick={clearFilters} className="text-muted-foreground hover:text-foreground">
+          {t('usage.clearFilters')}
+        </Button>
+      </div>
+
+      {/* 无卡片式图表走势与排行区 */}
+      <div className="grid grid-cols-1 gap-8 pb-6 border-b lg:grid-cols-3">
+        {/* 时间线趋势区 */}
+        <div className="lg:col-span-2 space-y-3">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <TrendingUpIcon className="size-4 text-brass" />
               <h2 className="text-sm font-medium">{t('usage.timelineTitle')}</h2>
@@ -241,7 +236,7 @@ export default function UsagePage() {
           </div>
 
           {timeline.length === 0 ? (
-            <div className="flex h-40 items-center justify-center font-mono text-xs text-muted-foreground">
+            <div className="flex h-44 items-center justify-center font-mono text-xs text-muted-foreground border border-dashed rounded-md">
               {t('usage.noChartData')}
             </div>
           ) : (
@@ -252,7 +247,7 @@ export default function UsagePage() {
                 return (
                   <div
                     key={idx}
-                    className="group relative flex flex-1 min-w-[20px] flex-col items-center justify-end h-full"
+                    className="group relative flex flex-1 min-w-[22px] flex-col items-center justify-end h-full"
                   >
                     <div className="absolute -top-10 z-10 hidden whitespace-nowrap rounded bg-popover px-2 py-1 font-mono text-[11px] shadow border text-popover-foreground group-hover:flex flex-col items-center">
                       <span>{tp.timestamp}</span>
@@ -260,7 +255,7 @@ export default function UsagePage() {
                     </div>
                     <div
                       style={{ height: `${heightPct}%` }}
-                      className="w-full rounded-xs bg-brass/80 transition-all group-hover:bg-brass"
+                      className="w-full bg-brass/80 hover:bg-brass transition-all rounded-t-xs"
                     />
                     <span className="mt-1 font-mono text-[9px] text-muted-foreground/70 -rotate-45 truncate max-w-[28px]">
                       {shortTime}
@@ -270,17 +265,17 @@ export default function UsagePage() {
               })}
             </div>
           )}
-        </Card>
+        </div>
 
-        {/* Top Models & Top Keys Distribution */}
-        <Card className="p-4 flex flex-col justify-between">
-          <div>
-            <div className="mb-3 flex items-center gap-2">
+        {/* 模型分布与活跃 Key 排行 */}
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
               <BarChart3Icon className="size-4 text-brass" />
               <h2 className="text-sm font-medium">{t('usage.topModelsTitle')}</h2>
             </div>
             {topModels.length === 0 ? (
-              <p className="py-4 text-center font-mono text-xs text-muted-foreground">{t('usage.noChartData')}</p>
+              <p className="py-2 font-mono text-xs text-muted-foreground">{t('usage.noChartData')}</p>
             ) : (
               <div className="space-y-2.5">
                 {topModels.slice(0, 5).map((m, idx) => {
@@ -291,7 +286,7 @@ export default function UsagePage() {
                         <span className="truncate max-w-[150px]" title={m.model}>{m.model}</span>
                         <span className="text-muted-foreground">{formatCompact(m.total_tokens)}</span>
                       </div>
-                      <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
+                      <div className="h-1.5 w-full bg-secondary overflow-hidden rounded-full">
                         <div style={{ width: `${pct}%` }} className="h-full bg-foreground/80 rounded-full" />
                       </div>
                     </div>
@@ -301,13 +296,13 @@ export default function UsagePage() {
             )}
           </div>
 
-          <div className="mt-4 pt-3 border-t">
-            <div className="mb-2 flex items-center gap-2">
+          <div className="space-y-3 pt-3 border-t">
+            <div className="flex items-center gap-2">
               <PieChartIcon className="size-4 text-brass" />
               <h2 className="text-sm font-medium">{t('usage.topKeysTitle')}</h2>
             </div>
             {topKeys.length === 0 ? (
-              <p className="py-2 text-center font-mono text-xs text-muted-foreground">{t('usage.noChartData')}</p>
+              <p className="py-2 font-mono text-xs text-muted-foreground">{t('usage.noChartData')}</p>
             ) : (
               <div className="space-y-2">
                 {topKeys.slice(0, 3).map((k, idx) => {
@@ -318,7 +313,7 @@ export default function UsagePage() {
                         <span className="truncate max-w-[150px]">{keyName(k.api_key_id)}</span>
                         <span className="text-muted-foreground">{formatCompact(k.total_tokens)}</span>
                       </div>
-                      <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
+                      <div className="h-1.5 w-full bg-secondary overflow-hidden rounded-full">
                         <div style={{ width: `${pct}%` }} className="h-full bg-brass/90 rounded-full" />
                       </div>
                     </div>
@@ -327,16 +322,16 @@ export default function UsagePage() {
               </div>
             )}
           </div>
-        </Card>
+        </div>
       </div>
 
-      {/* Detailed Request Logs */}
-      <p className="kicker mb-2 text-muted-foreground">{t('usage.recentLogs')}</p>
-      <Card className="gap-0 py-0 overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* 明细日志列表：取消外层 Card 包裹，直接融入页面 */}
+      <div className="space-y-3">
+        <p className="kicker text-muted-foreground">{t('usage.recentLogs')}</p>
+        <div className="overflow-x-auto border-y">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="border-b bg-muted/30">
                 <TableHead>{t('common.id')}</TableHead>
                 <TableHead>{t('keys.title')}</TableHead>
                 <TableHead>{t('keys.provider')}</TableHead>
@@ -350,19 +345,19 @@ export default function UsagePage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-6 text-center font-mono text-xs text-muted-foreground">
+                  <TableCell colSpan={8} className="py-8 text-center font-mono text-xs text-muted-foreground">
                     {t('common.loading')}
                   </TableCell>
                 </TableRow>
               ) : records.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-6 text-center font-mono text-xs text-muted-foreground">
+                  <TableCell colSpan={8} className="py-8 text-center font-mono text-xs text-muted-foreground">
                     {t('usage.empty')}
                   </TableCell>
                 </TableRow>
               ) : (
                 records.map((r) => (
-                  <TableRow key={r.id}>
+                  <TableRow key={r.id} className="border-b hover:bg-muted/20">
                     <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{r.id.slice(0, 8)}</TableCell>
                     <TableCell className="whitespace-nowrap">{keyName(r.api_key_id)}</TableCell>
                     <TableCell className="whitespace-nowrap">{providerName(r.provider_id)}</TableCell>
@@ -377,22 +372,24 @@ export default function UsagePage() {
             </TableBody>
           </Table>
         </div>
-      </Card>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-center gap-3">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-            <ChevronLeftIcon className="size-4" />
-          </Button>
-          <span className="font-mono text-xs text-muted-foreground">
-            {t('common.page')} {page} / {totalPages}
-          </span>
-          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-            <ChevronRightIcon className="size-4" />
-          </Button>
-        </div>
-      )}
+        {/* 分页控制 */}
+        {totalPages > 1 && (
+          <div className="pt-2 flex items-center justify-between">
+            <span className="font-mono text-xs text-muted-foreground">
+              {t('common.page')} {page} / {totalPages}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+                <ChevronLeftIcon className="size-4" />
+              </Button>
+              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+                <ChevronRightIcon className="size-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

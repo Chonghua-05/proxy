@@ -5,7 +5,6 @@ import PageHeader from '@/components/PageHeader'
 import DismissibleAlert from '@/components/DismissibleAlert'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -103,56 +102,54 @@ export default function ProvidersPage() {
       {flash && <DismissibleAlert variant="success" className="mb-4" onClose={() => setFlash('')}>{flash}</DismissibleAlert>}
       {error && <DismissibleAlert variant="destructive" className="mb-4" onClose={() => setError('')}>{error}</DismissibleAlert>}
 
-      <Card className="gap-0 py-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
+      <div className="overflow-x-auto border-y">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-b bg-muted/30">
+              <TableHead>{t('common.id')}</TableHead>
+              <TableHead>{t('common.name')}</TableHead>
+              <TableHead>{t('providers.baseUrl')}</TableHead>
+              <TableHead>{t('common.created')}</TableHead>
+              <TableHead className="w-12" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
               <TableRow>
-                <TableHead>{t('common.id')}</TableHead>
-                <TableHead>{t('common.name')}</TableHead>
-                <TableHead>{t('providers.baseUrl')}</TableHead>
-                <TableHead>{t('common.created')}</TableHead>
-                <TableHead className="w-12" />
+                <TableCell colSpan={5} className="py-8 text-center font-mono text-xs text-muted-foreground">
+                  {t('common.loading')}
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="py-6 text-center font-mono text-xs text-muted-foreground">
-                    {t('common.loading')}
+            ) : providers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="py-8 text-center font-mono text-xs text-muted-foreground">
+                  {t('providers.empty')}
+                </TableCell>
+              </TableRow>
+            ) : (
+              providers.map((p) => (
+                <TableRow key={p.id} className="border-b hover:bg-muted/20">
+                  <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{p.id.slice(0, 8)}</TableCell>
+                  <TableCell className="font-medium whitespace-nowrap">{p.name}</TableCell>
+                  <TableCell className="font-mono text-xs max-w-xs truncate">{p.base_url}</TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(p.created_at)}</TableCell>
+                  <TableCell className="py-1 text-right whitespace-nowrap">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Delete provider ${p.name}`}
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => setDeleteTarget(p)}
+                    >
+                      <Trash2Icon className="size-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
-              ) : providers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="py-6 text-center font-mono text-xs text-muted-foreground">
-                    {t('providers.empty')}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                providers.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{p.id.slice(0, 8)}</TableCell>
-                    <TableCell className="font-medium whitespace-nowrap">{p.name}</TableCell>
-                    <TableCell className="font-mono text-xs max-w-xs truncate">{p.base_url}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(p.created_at)}</TableCell>
-                    <TableCell className="py-1 text-right whitespace-nowrap">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Delete provider ${p.name}`}
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() => setDeleteTarget(p)}
-                      >
-                        <Trash2Icon className="size-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-lg">

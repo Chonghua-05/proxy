@@ -6,7 +6,6 @@ import DismissibleAlert from '@/components/DismissibleAlert'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -150,111 +149,107 @@ export default function GuardrailsPage() {
 
       {/* Guardrail rules */}
       <p className="kicker mb-2 text-muted-foreground">{t('guardrails.rulesTab')}</p>
-      <Card className="mb-8 gap-0 py-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
+      <div className="mb-8 overflow-x-auto border-y">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-b bg-muted/30">
+              <TableHead>{t('common.id')}</TableHead>
+              <TableHead>{t('guardrails.pattern')}</TableHead>
+              <TableHead>{t('guardrails.mode')}</TableHead>
+              <TableHead>{t('guardrails.replaceBy')}</TableHead>
+              <TableHead>{t('common.created')}</TableHead>
+              <TableHead className="w-12" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
               <TableRow>
-                <TableHead>{t('common.id')}</TableHead>
-                <TableHead>{t('guardrails.pattern')}</TableHead>
-                <TableHead>{t('guardrails.mode')}</TableHead>
-                <TableHead>{t('guardrails.replaceBy')}</TableHead>
-                <TableHead>{t('common.created')}</TableHead>
-                <TableHead className="w-12" />
+                <TableCell colSpan={6} className="py-8 text-center font-mono text-xs text-muted-foreground">
+                  {t('common.loading')}
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-6 text-center font-mono text-xs text-muted-foreground">
-                    {t('common.loading')}
+            ) : guardrails.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="py-8 text-center font-mono text-xs text-muted-foreground">
+                  {t('guardrails.empty')}
+                </TableCell>
+              </TableRow>
+            ) : (
+              guardrails.map((g) => (
+                <TableRow key={g.id} className="border-b hover:bg-muted/20">
+                  <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{g.id.slice(0, 8)}</TableCell>
+                  <TableCell className="font-mono text-xs max-w-xs truncate">{g.pattern}</TableCell>
+                  <TableCell className="whitespace-nowrap"><ModeBadge mode={g.mode} /></TableCell>
+                  <TableCell className="font-mono text-xs">{g.replace_by || '—'}</TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(g.created_at)}</TableCell>
+                  <TableCell className="py-1 text-right whitespace-nowrap">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Delete guardrail rule"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => setDeleteTarget(g)}
+                    >
+                      <Trash2Icon className="size-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
-              ) : guardrails.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-6 text-center font-mono text-xs text-muted-foreground">
-                    {t('guardrails.empty')}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                guardrails.map((g) => (
-                  <TableRow key={g.id}>
-                    <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{g.id.slice(0, 8)}</TableCell>
-                    <TableCell className="font-mono text-xs max-w-xs truncate">{g.pattern}</TableCell>
-                    <TableCell className="whitespace-nowrap"><ModeBadge mode={g.mode} /></TableCell>
-                    <TableCell className="font-mono text-xs">{g.replace_by || '—'}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(g.created_at)}</TableCell>
-                    <TableCell className="py-1 text-right whitespace-nowrap">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="Delete guardrail rule"
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() => setDeleteTarget(g)}
-                      >
-                        <Trash2Icon className="size-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       {/* Guardrail events */}
       <p className="kicker mb-2 text-muted-foreground">{t('guardrails.eventsTab')}</p>
-      <Card className="gap-0 py-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
+      <div className="overflow-x-auto border-y">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-b bg-muted/30">
+              <TableHead>{t('common.id')}</TableHead>
+              <TableHead>{t('guardrails.pattern')}</TableHead>
+              <TableHead>{t('guardrails.mode')}</TableHead>
+              <TableHead>{t('keys.title')}</TableHead>
+              <TableHead>{t('guardrails.matchedInput')}</TableHead>
+              <TableHead>{t('usage.timestamp')}</TableHead>
+              <TableHead className="w-12" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {events.length === 0 ? (
               <TableRow>
-                <TableHead>{t('common.id')}</TableHead>
-                <TableHead>{t('guardrails.pattern')}</TableHead>
-                <TableHead>{t('guardrails.mode')}</TableHead>
-                <TableHead>{t('keys.title')}</TableHead>
-                <TableHead>{t('guardrails.matchedInput')}</TableHead>
-                <TableHead>{t('usage.timestamp')}</TableHead>
-                <TableHead className="w-12" />
+                <TableCell colSpan={7} className="py-8 text-center font-mono text-xs text-muted-foreground">
+                  {t('guardrails.eventsEmpty')}
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {events.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-6 text-center font-mono text-xs text-muted-foreground">
-                    {t('guardrails.eventsEmpty')}
+            ) : (
+              events.map((ev) => (
+                <TableRow key={ev.id} className="border-b hover:bg-muted/20">
+                  <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{ev.id.slice(0, 8)}</TableCell>
+                  <TableCell className="font-mono text-xs max-w-xs truncate">{ev.pattern}</TableCell>
+                  <TableCell className="whitespace-nowrap"><ModeBadge mode={ev.mode} /></TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{ev.api_key_id.slice(0, 8)}</TableCell>
+                  <TableCell className="max-w-xs truncate whitespace-nowrap text-xs" title={ev.input_text}>
+                    {ev.input_text}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(ev.created_at)}</TableCell>
+                  <TableCell className="py-1 text-right whitespace-nowrap">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Delete event"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDeleteEvent(ev.id)}
+                    >
+                      <Trash2Icon className="size-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
-              ) : (
-                events.map((ev) => (
-                  <TableRow key={ev.id}>
-                    <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{ev.id.slice(0, 8)}</TableCell>
-                    <TableCell className="font-mono text-xs max-w-xs truncate">{ev.pattern}</TableCell>
-                    <TableCell className="whitespace-nowrap"><ModeBadge mode={ev.mode} /></TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{ev.api_key_id.slice(0, 8)}</TableCell>
-                    <TableCell className="max-w-xs truncate whitespace-nowrap text-xs" title={ev.input_text}>
-                      {ev.input_text}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(ev.created_at)}</TableCell>
-                    <TableCell className="py-1 text-right whitespace-nowrap">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="Delete event"
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() => handleDeleteEvent(ev.id)}
-                      >
-                        <Trash2Icon className="size-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       {/* Create rule */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>

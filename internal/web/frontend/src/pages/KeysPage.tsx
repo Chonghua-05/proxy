@@ -6,7 +6,6 @@ import DismissibleAlert from '@/components/DismissibleAlert'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -188,82 +187,80 @@ export default function KeysPage() {
       {flash && <DismissibleAlert variant="success" className="mb-4" onClose={() => setFlash('')}>{flash}</DismissibleAlert>}
       {error && <DismissibleAlert variant="destructive" className="mb-4" onClose={() => setError('')}>{error}</DismissibleAlert>}
 
-      <Card className="gap-0 py-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
+      <div className="overflow-x-auto border-y">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-b bg-muted/30">
+              <TableHead>{t('common.id')}</TableHead>
+              <TableHead>{t('common.name')}</TableHead>
+              <TableHead>{t('keys.provider')}</TableHead>
+              <TableHead className="text-right">RPM</TableHead>
+              <TableHead>{t('keys.status')}</TableHead>
+              <TableHead>{t('common.created')}</TableHead>
+              <TableHead className="w-20 text-right">{t('common.actions')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
               <TableRow>
-                <TableHead>{t('common.id')}</TableHead>
-                <TableHead>{t('common.name')}</TableHead>
-                <TableHead>{t('keys.provider')}</TableHead>
-                <TableHead className="text-right">RPM</TableHead>
-                <TableHead>{t('keys.status')}</TableHead>
-                <TableHead>{t('common.created')}</TableHead>
-                <TableHead className="w-20 text-right">{t('common.actions')}</TableHead>
+                <TableCell colSpan={7} className="py-8 text-center font-mono text-xs text-muted-foreground">
+                  {t('common.loading')}
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-6 text-center font-mono text-xs text-muted-foreground">
-                    {t('common.loading')}
+            ) : keys.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="py-8 text-center font-mono text-xs text-muted-foreground">
+                  {t('keys.empty')}
+                </TableCell>
+              </TableRow>
+            ) : (
+              keys.map((k) => (
+                <TableRow key={k.id} className="border-b hover:bg-muted/20">
+                  <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{k.id.slice(0, 8)}</TableCell>
+                  <TableCell className="font-medium whitespace-nowrap">{k.name}</TableCell>
+                  <TableCell className="whitespace-nowrap">{providerName(k.provider_id)}</TableCell>
+                  <TableCell className="text-right font-mono text-xs tabular-nums">{k.rate_limit_rpm}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {k.revoked_at ? (
+                      <Badge variant="muted">{t('keys.revoked')}</Badge>
+                    ) : (
+                      <Badge variant="outline">
+                        <span className="size-1.5 bg-brass mr-1" aria-hidden />
+                        {t('keys.active')}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(k.created_at)}</TableCell>
+                  <TableCell className="py-1 text-right whitespace-nowrap">
+                    {!k.revoked_at && (
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`${t('keys.edit')} ${k.name}`}
+                          className="text-muted-foreground hover:text-foreground"
+                          onClick={() => startEdit(k)}
+                        >
+                          <PencilIcon className="size-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Revoke key ${k.name}`}
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() => setRevokeTarget(k)}
+                        >
+                          <Trash2Icon className="size-3.5" />
+                        </Button>
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
-              ) : keys.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-6 text-center font-mono text-xs text-muted-foreground">
-                    {t('keys.empty')}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                keys.map((k) => (
-                  <TableRow key={k.id}>
-                    <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{k.id.slice(0, 8)}</TableCell>
-                    <TableCell className="font-medium whitespace-nowrap">{k.name}</TableCell>
-                    <TableCell className="whitespace-nowrap">{providerName(k.provider_id)}</TableCell>
-                    <TableCell className="text-right font-mono text-xs tabular-nums">{k.rate_limit_rpm}</TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {k.revoked_at ? (
-                        <Badge variant="muted">{t('keys.revoked')}</Badge>
-                      ) : (
-                        <Badge variant="outline">
-                          <span className="size-1.5 bg-brass mr-1" aria-hidden />
-                          {t('keys.active')}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(k.created_at)}</TableCell>
-                    <TableCell className="py-1 text-right whitespace-nowrap">
-                      {!k.revoked_at && (
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label={`${t('keys.edit')} ${k.name}`}
-                            className="text-muted-foreground hover:text-foreground"
-                            onClick={() => startEdit(k)}
-                          >
-                            <PencilIcon className="size-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label={`Revoke key ${k.name}`}
-                            className="text-muted-foreground hover:text-destructive"
-                            onClick={() => setRevokeTarget(k)}
-                          >
-                            <Trash2Icon className="size-3.5" />
-                          </Button>
-                        </div>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       {/* Create Modal */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
