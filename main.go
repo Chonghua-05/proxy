@@ -96,6 +96,7 @@ func main() {
 	)
 
 	v1.POST("/chat/completions", proxyH.ChatCompletion)
+	v1.POST("/responses", proxyH.Responses)
 	v1.GET("/models", proxyH.ListModels)
 
 	// Start.

@@ -49,6 +49,26 @@ func (h *ProxyHandler) ChatCompletion(c echo.Context) error {
 	return nil
 }
 
+func (h *ProxyHandler) Responses(c echo.Context) error {
+	apiKey := middleware.GetAPIKey(c)
+	if apiKey == nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "missing api key")
+	}
+
+	provider, err := h.providers.GetByID(apiKey.ProviderID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to look up provider")
+	}
+	if provider == nil {
+		return echo.NewHTTPError(http.StatusBadGateway, "provider not found for this key")
+	}
+
+	if err := h.forwarder.ForwardResponses(c.Response().Writer, c.Request(), provider, apiKey); err != nil {
+		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
+	}
+	return nil
+}
+
 func (h *ProxyHandler) ListModels(c echo.Context) error {
 	apiKey := middleware.GetAPIKey(c)
 	if apiKey == nil {

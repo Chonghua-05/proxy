@@ -39,6 +39,30 @@ func TestChatCompletion_NoAPIKey(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, he.Code)
 }
 
+func TestResponses_NoAPIKey(t *testing.T) {
+	database, err := db.Open(":memory:")
+	require.NoError(t, err)
+	defer database.Close()
+
+	ps := store.NewProviderStore(database)
+	us := store.NewUsageStore(database)
+	gs := store.NewGuardrailStore(database)
+	ges := store.NewGuardrailEventStore(database)
+	f := proxy.NewForwarder(us, gs, ges)
+	h := NewProxyHandler(f, ps)
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err = h.Responses(c)
+	assert.Error(t, err)
+	he, ok := err.(*echo.HTTPError)
+	require.True(t, ok)
+	assert.Equal(t, http.StatusUnauthorized, he.Code)
+}
+
 func TestChatCompletion_ProviderNotFound(t *testing.T) {
 	database, err := db.Open(":memory:")
 	require.NoError(t, err)

@@ -209,11 +209,34 @@ func (f *Forwarder) recordGuardrailEvent(g models.Guardrail, apiKeyID, inputText
 	return err
 }
 
-// usagePayload is the token-usage portion of a non-streaming response.
+// usagePayload is the token-usage portion of a response.
+// Supports both Chat Completions (prompt_tokens/completion_tokens)
+// and Responses API (input_tokens/output_tokens).
 type usagePayload struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
 	TotalTokens      int `json:"total_tokens"`
+	InputTokens      int `json:"input_tokens"`
+	OutputTokens     int `json:"output_tokens"`
+}
+
+func (u *usagePayload) normalize() (prompt, completion, total int) {
+	if u == nil {
+		return 0, 0, 0
+	}
+	prompt = u.PromptTokens
+	if prompt == 0 {
+		prompt = u.InputTokens
+	}
+	completion = u.CompletionTokens
+	if completion == 0 {
+		completion = u.OutputTokens
+	}
+	total = u.TotalTokens
+	if total == 0 {
+		total = prompt + completion
+	}
+	return prompt, completion, total
 }
 
 type completionResponse struct {
@@ -221,8 +244,13 @@ type completionResponse struct {
 }
 
 // streamChunkUsage represents the usage field that may appear in a streaming chunk.
+// For Chat Completions: {"usage": {...}}
+// For Responses API: {"type": "response.completed", "response": {"usage": {...}}}
 type streamChunkUsage struct {
-	Usage *usagePayload `json:"usage"`
+	Usage    *usagePayload `json:"usage"`
+	Response *struct {
+		Usage *usagePayload `json:"usage"`
+	} `json:"response"`
 }
 
 // ForwardChatCompletion handles both streaming and non-streaming chat completions.
@@ -314,10 +342,13 @@ func (f *Forwarder) handleNonStreaming(
 	if resp.StatusCode == http.StatusOK {
 		var cr completionResponse
 		if json.Unmarshal(body, &cr) == nil && cr.Usage != nil {
-			_ = f.usage.Record(
-				apiKey.ID, provider.ID, model,
-				cr.Usage.PromptTokens, cr.Usage.CompletionTokens, cr.Usage.TotalTokens,
-			)
+			prompt, completion, total := cr.Usage.normalize()
+			if total > 0 {
+				_ = f.usage.Record(
+					apiKey.ID, provider.ID, model,
+					prompt, completion, total,
+				)
+			}
 		}
 	}
 
@@ -361,8 +392,12 @@ func (f *Forwarder) handleStreaming(
 			data := strings.TrimPrefix(line, "data: ")
 			if data != "[DONE]" {
 				var chunk streamChunkUsage
-				if json.Unmarshal([]byte(data), &chunk) == nil && chunk.Usage != nil {
-					totalUsage = *chunk.Usage
+				if json.Unmarshal([]byte(data), &chunk) == nil {
+					if chunk.Usage != nil {
+						totalUsage = *chunk.Usage
+					} else if chunk.Response != nil && chunk.Response.Usage != nil {
+						totalUsage = *chunk.Response.Usage
+					}
 				}
 			}
 		}
@@ -372,14 +407,63 @@ func (f *Forwarder) handleStreaming(
 	}
 
 	// Record usage if we got any.
-	if totalUsage.TotalTokens > 0 {
+	prompt, completion, total := totalUsage.normalize()
+	if total > 0 {
 		_ = f.usage.Record(
 			apiKey.ID, provider.ID, model,
-			totalUsage.PromptTokens, totalUsage.CompletionTokens, totalUsage.TotalTokens,
+			prompt, completion, total,
 		)
 	}
 
 	return scanner.Err()
+}
+
+// responseRequest is the minimal structure needed to inspect model/stream for /v1/responses.
+type responseRequest struct {
+	Model  string `json:"model"`
+	Stream bool   `json:"stream"`
+}
+
+// ForwardResponses proxies an OpenAI Responses API request to the upstream provider.
+func (f *Forwarder) ForwardResponses(
+	w http.ResponseWriter,
+	r *http.Request,
+	provider *models.Provider,
+	apiKey *models.APIKey,
+) error {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return fmt.Errorf("read body: %w", err)
+	}
+	defer r.Body.Close()
+
+	var req responseRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		return fmt.Errorf("parse request: %w", err)
+	}
+
+	upstreamURL := strings.TrimRight(provider.BaseURL, "/") + "/v1/responses"
+	upReq, err := http.NewRequestWithContext(r.Context(), http.MethodPost, upstreamURL, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create upstream request: %w", err)
+	}
+	upReq.Header.Set("Content-Type", "application/json")
+	upReq.Header.Set("Authorization", "Bearer "+provider.APIKey)
+
+	if accept := r.Header.Get("Accept"); accept != "" {
+		upReq.Header.Set("Accept", accept)
+	}
+
+	resp, err := f.client.Do(upReq)
+	if err != nil {
+		return fmt.Errorf("upstream request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if req.Stream {
+		return f.handleStreaming(w, resp, req.Model, provider, apiKey)
+	}
+	return f.handleNonStreaming(w, resp, req.Model, provider, apiKey)
 }
 
 // ForwardListModels proxies a GET /v1/models request to the upstream provider.

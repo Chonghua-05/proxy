@@ -426,6 +426,29 @@ paths:
         "502":
           $ref: "#/components/responses/BadGateway"
 
+  /v1/responses:
+    post:
+      tags: [Proxy]
+      summary: Forward an OpenAI Responses API request
+      operationId: createResponse
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Response or SSE event stream
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
   /v1/models:
     get:
       tags: [Proxy]

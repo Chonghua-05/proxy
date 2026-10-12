@@ -367,3 +367,88 @@ func TestNewForwarder(t *testing.T) {
 	assert.NotNil(t, f.guardrails)
 	assert.NotNil(t, f.guardrailEvents)
 }
+
+func TestForwardResponses_NonStreaming(t *testing.T) {
+	f, us, keyID, providerID := setupForwarder(t)
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/v1/responses", r.URL.Path)
+		assert.Equal(t, "Bearer sk-upstream", r.Header.Get("Authorization"))
+
+		resp := map[string]interface{}{
+			"id":     "resp_123",
+			"object": "response",
+			"model":  "gemini-3.8-flash-high",
+			"usage": map[string]int{
+				"input_tokens":  12,
+				"output_tokens": 34,
+				"total_tokens":  46,
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer upstream.Close()
+
+	provider := &models.Provider{
+		ID:      providerID,
+		BaseURL: upstream.URL,
+		APIKey:  "sk-upstream",
+	}
+	apiKey := &models.APIKey{ID: keyID, ProviderID: providerID}
+
+	body := `{"model":"gemini-3.8-flash-high","input":"hello"}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	err := f.ForwardResponses(rec, req, provider, apiKey)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	result, err := us.Query(store.UsageQuery{APIKeyID: keyID})
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.Total)
+	assert.Equal(t, 12, result.Records[0].PromptTokens)
+	assert.Equal(t, 34, result.Records[0].CompletionTokens)
+	assert.Equal(t, 46, result.Records[0].TotalTokens)
+}
+
+func TestForwardResponses_Streaming(t *testing.T) {
+	f, us, keyID, providerID := setupForwarder(t)
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/v1/responses", r.URL.Path)
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		flusher := w.(http.Flusher)
+
+		fmt.Fprintln(w, `event: response.completed`)
+		fmt.Fprintln(w, `data: {"type":"response.completed","response":{"id":"resp_1","usage":{"input_tokens":7,"output_tokens":21,"total_tokens":28}}}`)
+		flusher.Flush()
+	}))
+	defer upstream.Close()
+
+	provider := &models.Provider{
+		ID:      providerID,
+		BaseURL: upstream.URL,
+		APIKey:  "sk-upstream",
+	}
+	apiKey := &models.APIKey{ID: keyID, ProviderID: providerID}
+
+	body := `{"model":"gemini-3.8-flash-high","input":"hello","stream":true}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	err := f.ForwardResponses(rec, req, provider, apiKey)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	result, err := us.Query(store.UsageQuery{APIKeyID: keyID})
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.Total)
+	assert.Equal(t, 7, result.Records[0].PromptTokens)
+	assert.Equal(t, 21, result.Records[0].CompletionTokens)
+	assert.Equal(t, 28, result.Records[0].TotalTokens)
+}
