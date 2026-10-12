@@ -48,6 +48,7 @@ function ThemeToggle() {
       aria-label={resolvedTheme === 'dark' ? t('theme.switchToLight') : t('theme.switchToDark')}
       title={resolvedTheme === 'dark' ? t('theme.switchToLight') : t('theme.switchToDark')}
       onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+      className="rounded-lg"
     >
       {resolvedTheme === 'dark' ? <SunIcon /> : <MoonIcon />}
     </Button>
@@ -61,7 +62,7 @@ function LanguageToggle() {
     <Button
       variant="ghost"
       size="sm"
-      className="h-8 px-2 font-mono text-xs gap-1"
+      className="h-8 px-2 font-mono text-xs gap-1 rounded-lg"
       aria-label={isZh ? t('lang.switchToEn') : t('lang.switchToZh')}
       title={isZh ? t('lang.switchToEn') : t('lang.switchToZh')}
       onClick={() => setLanguage(isZh ? 'en' : 'zh-CN')}
@@ -79,13 +80,13 @@ export default function Layout() {
   const { t } = useI18n()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  // 路由跳转时自动关闭移动端菜单
+  // 路由跳转时自动关闭移动端抽屉
   useEffect(() => {
     setMobileMenuOpen(false)
   }, [location.pathname])
 
   const NavList = ({ onSelect }: { onSelect?: () => void }) => (
-    <ul className="grid gap-px">
+    <ul className="grid gap-1 px-2">
       {NAV_ITEMS.map((item) => (
         <li key={item.path}>
           <NavLink
@@ -93,15 +94,15 @@ export default function Layout() {
             onClick={onSelect}
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-3 border-l-2 border-transparent px-4 py-2.5 text-sm text-muted-foreground transition-colors',
-                'hover:bg-accent hover:text-accent-foreground',
-                isActive && 'border-brass bg-accent text-foreground font-medium',
+                'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-all duration-150',
+                'hover:bg-accent/80 hover:text-accent-foreground',
+                isActive && 'bg-card text-foreground font-medium shadow-2xs border border-border/60',
               )
             }
           >
-            <span className="font-mono text-xs text-muted-foreground/70">{item.index}</span>
-            <item.icon className="size-4 shrink-0" aria-hidden />
-            <span className="truncate">{t(item.labelKey)}</span>
+            <span className="font-mono text-xs text-muted-foreground/70 group-hover:text-brass transition-colors">{item.index}</span>
+            <item.icon className="size-4 shrink-0 transition-colors group-hover:text-brass" aria-hidden />
+            <span className="truncate flex-1">{t(item.labelKey)}</span>
           </NavLink>
         </li>
       ))}
@@ -114,15 +115,16 @@ export default function Layout() {
   }
 
   return (
-    <div className="flex min-h-svh flex-col md:flex-row">
+    <div className="flex h-svh w-screen overflow-hidden flex-col md:flex-row bg-background">
       {/* 移动端顶部标题栏 */}
-      <header className="flex h-14 items-center justify-between border-b px-4 md:hidden bg-background sticky top-0 z-30">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 md:hidden bg-background/95 backdrop-blur-xs z-30">
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
             size="icon-sm"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle navigation menu"
+            className="rounded-lg"
           >
             {mobileMenuOpen ? <XIcon className="size-5" /> : <MenuIcon className="size-5" />}
           </Button>
@@ -134,7 +136,7 @@ export default function Layout() {
         </div>
       </header>
 
-      {/* 移动端抽屉遮罩与侧栏 */}
+      {/* 移动端抽屉遮罩 */}
       {mobileMenuOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs md:hidden"
@@ -142,13 +144,14 @@ export default function Layout() {
         />
       )}
 
+      {/* 侧边栏（桌面端固定高且独占左侧，绝对不跟随主内容滚动；有独立滚动支持） */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r bg-background transition-transform duration-200 ease-in-out md:static md:w-60 md:shrink-0 md:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 flex h-full w-64 shrink-0 flex-col border-r bg-card/40 backdrop-blur-md transition-transform duration-200 ease-in-out md:static md:w-60 md:translate-x-0',
           mobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0',
         )}
       >
-        <div className="flex h-14 items-center justify-between gap-2 px-4">
+        <div className="flex h-14 shrink-0 items-center justify-between gap-2 px-4">
           <Lockup className="text-lg" />
           <div className="flex items-center gap-1">
             <LanguageToggle />
@@ -163,11 +166,11 @@ export default function Layout() {
         </nav>
 
         <Separator />
-        <div className="py-2">
+        <div className="p-2 shrink-0">
           <button
             type="button"
             onClick={handleLogout}
-            className="flex w-full items-center gap-3 border-l-2 border-transparent px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive"
           >
             <span className="font-mono text-xs text-muted-foreground/70">·</span>
             <LogOutIcon className="size-4 shrink-0" aria-hidden />
@@ -175,14 +178,14 @@ export default function Layout() {
           </button>
         </div>
 
-        <div className="flex items-center gap-2 border-t px-4 py-3 font-mono text-xs text-muted-foreground">
+        <div className="flex shrink-0 items-center gap-2 border-t px-4 py-3 font-mono text-xs text-muted-foreground bg-card/20">
           <span className="flex-1 truncate">lab34 — llm-proxy</span>
           <Monogram size={20} variant="outline" />
         </div>
       </aside>
 
-      {/* 主工作区 */}
-      <main className="min-w-0 flex-1 overflow-x-hidden">
+      {/* 主工作区（独立滚动容器，内部上下滑动完全与侧栏解耦） */}
+      <main className="min-w-0 flex-1 h-full overflow-y-auto overflow-x-hidden">
         <div className="mx-auto max-w-6xl p-3 sm:p-6 lg:p-8">
           <Outlet />
         </div>

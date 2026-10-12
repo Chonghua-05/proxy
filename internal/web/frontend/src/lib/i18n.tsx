@@ -36,6 +36,8 @@ export const translations = {
     'common.page': 'Page',
     'common.of': 'of',
     'common.confirm': 'Confirm',
+    'common.refresh': 'Refresh',
+    'common.refreshing': 'Refreshing…',
 
     // Login
     'login.title': 'Console',
@@ -191,6 +193,8 @@ export const translations = {
     'common.page': '第',
     'common.of': '页，共',
     'common.confirm': '确认',
+    'common.refresh': '刷新',
+    'common.refreshing': '刷新中…',
 
     // Login
     'login.title': '控制台登录',

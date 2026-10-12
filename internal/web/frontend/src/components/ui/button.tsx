@@ -5,16 +5,16 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background neu-btn rounded-md",
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+        default: 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm',
         // Danger stays a stroke, not a fill — brass never floods a surface.
         destructive:
           'border border-destructive/50 text-destructive hover:border-destructive hover:bg-destructive/5',
-        outline: 'border bg-transparent hover:bg-accent hover:text-accent-foreground',
-        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/70',
+        outline: 'border bg-card/60 hover:bg-accent hover:text-accent-foreground shadow-2xs',
+        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80 shadow-2xs',
         ghost: 'hover:bg-accent hover:text-accent-foreground',
         link: 'text-brass-ink underline-offset-4 hover:underline decoration-brass',
       },

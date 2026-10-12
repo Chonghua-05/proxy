@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { ChevronLeftIcon, ChevronRightIcon, BarChart3Icon, TrendingUpIcon, PieChartIcon } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { ChevronLeftIcon, ChevronRightIcon, BarChart3Icon, TrendingUpIcon, PieChartIcon, RefreshCwIcon } from 'lucide-react'
 
 import PageHeader from '@/components/PageHeader'
 import DismissibleAlert from '@/components/DismissibleAlert'
@@ -51,6 +51,7 @@ export default function UsagePage() {
   const [keys, setKeys] = useState<APIKey[]>([])
   const [providers, setProviders] = useState<Provider[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
 
   // Filters
@@ -60,6 +61,12 @@ export default function UsagePage() {
   const [filterEnd, setFilterEnd] = useState('')
   const [page, setPage] = useState(1)
   const perPage = 50
+
+  const [refreshTick, setRefreshTick] = useState(0)
+  const reload = useCallback(() => {
+    setRefreshing(true)
+    setRefreshTick((t) => t + 1)
+  }, [])
 
   useEffect(() => {
     let stale = false
@@ -95,11 +102,14 @@ export default function UsagePage() {
       } catch (err: unknown) {
         if (!stale) setError(err instanceof Error ? err.message : 'Failed to load usage')
       } finally {
-        if (!stale) setLoading(false)
+        if (!stale) {
+          setLoading(false)
+          setRefreshing(false)
+        }
       }
     })()
     return () => { stale = true }
-  }, [page, filterKeyId, filterProviderId, filterStart, filterEnd])
+  }, [page, filterKeyId, filterProviderId, filterStart, filterEnd, refreshTick])
 
   const totalPages = Math.max(1, Math.ceil(total / perPage))
 
@@ -134,6 +144,19 @@ export default function UsagePage() {
         index="03"
         title={t('usage.title')}
         description={t('usage.description')}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={reload}
+            disabled={refreshing || loading}
+            className="gap-1.5"
+            aria-label={t('common.refresh')}
+          >
+            <RefreshCwIcon className={`size-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            <span>{refreshing ? t('common.refreshing') : t('common.refresh')}</span>
+          </Button>
+        }
       />
 
       {error && <DismissibleAlert variant="destructive" className="mb-4" onClose={() => setError('')}>{error}</DismissibleAlert>}
