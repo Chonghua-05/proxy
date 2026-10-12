@@ -228,9 +228,9 @@ export default function UsagePage() {
 
       {/* 图表区 */}
       <div className="grid grid-cols-1 gap-8 pb-6 border-b lg:grid-cols-3">
-        {/* 柱状时序走势 */}
-        <div className="lg:col-span-2 space-y-3">
-          <div className="flex items-center justify-between">
+        {/* 柱状时序走势：固定 h-72 撑满上下 */}
+        <div className="lg:col-span-2 flex flex-col justify-between h-72">
+          <div className="flex items-center justify-between shrink-0 mb-1">
             <div className="flex items-center gap-2">
               <TrendingUpIcon className="size-4 text-brass" />
               <h2 className="text-sm font-medium">{t('usage.timelineTitle')}</h2>
@@ -241,33 +241,44 @@ export default function UsagePage() {
           </div>
 
           {timeline.length === 0 ? (
-            <div className="flex h-40 items-center justify-center font-mono text-xs text-muted-foreground border border-dashed rounded-md">
+            <div className="flex flex-1 items-center justify-center font-mono text-xs text-muted-foreground border border-dashed rounded-md">
               {t('usage.noChartData')}
             </div>
           ) : (
-            <div>
-              <div className="flex h-36 items-end gap-1.5 pt-2">
-                {timeline.map((tp, idx) => {
-                  const heightPct = Math.max(6, Math.round((tp.total_tokens / maxTokens) * 100))
-                  return (
-                    <div
-                      key={idx}
-                      className="group relative flex flex-1 min-w-[12px] flex-col items-center justify-end h-full"
-                    >
-                      <div className="absolute -top-12 z-20 hidden whitespace-nowrap rounded-md bg-popover px-2.5 py-1.5 font-mono text-[11px] shadow-lg border text-popover-foreground group-hover:flex flex-col items-center pointer-events-none">
-                        <span className="text-muted-foreground">{tp.timestamp}</span>
-                        <span className="font-medium text-foreground">{tp.total_tokens.toLocaleString()} tokens ({tp.requests} reqs)</span>
-                      </div>
+            <div className="flex flex-1 flex-col justify-between pt-1">
+              <div className="relative flex-1 flex items-end">
+                {/* 背景水平参考线 */}
+                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-30">
+                  <div className="border-b border-dashed border-border w-full" />
+                  <div className="border-b border-dashed border-border w-full" />
+                  <div className="border-b border-border w-full" />
+                </div>
+
+                {/* 柱状图 */}
+                <div className="relative z-10 flex w-full h-full items-end gap-1.5 px-1">
+                  {timeline.map((tp, idx) => {
+                    const heightPct = Math.max(6, Math.round((tp.total_tokens / maxTokens) * 100))
+                    return (
                       <div
-                        style={{ height: `${heightPct}%` }}
-                        className="w-full bg-brass/80 hover:bg-brass transition-all rounded-xs"
-                      />
-                    </div>
-                  )
-                })}
+                        key={idx}
+                        className="group relative flex flex-1 min-w-[10px] flex-col items-center justify-end h-full"
+                      >
+                        <div className="absolute -top-12 z-20 hidden whitespace-nowrap rounded-md bg-popover px-2.5 py-1.5 font-mono text-[11px] shadow-lg border text-popover-foreground group-hover:flex flex-col items-center pointer-events-none">
+                          <span className="text-muted-foreground">{tp.timestamp}</span>
+                          <span className="font-medium text-foreground">{tp.total_tokens.toLocaleString()} tokens ({tp.requests} reqs)</span>
+                        </div>
+                        <div
+                          style={{ height: `${heightPct}%` }}
+                          className="w-full bg-brass/80 hover:bg-brass transition-all rounded-t-xs"
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-              {/* 平整的时间刻度，只显示首尾与中间，不重叠 */}
-              <div className="mt-2 flex justify-between border-t pt-1 font-mono text-[10px] text-muted-foreground/80">
+
+              {/* 平整的时间刻度 */}
+              <div className="mt-2 flex justify-between border-t pt-1.5 font-mono text-[10px] text-muted-foreground/80 shrink-0">
                 <span>{timeline[0]?.timestamp.slice(5)}</span>
                 {timeline.length > 4 && <span>{timeline[Math.floor(timeline.length / 2)]?.timestamp.slice(5)}</span>}
                 <span>{timeline[timeline.length - 1]?.timestamp.slice(5)}</span>
@@ -276,9 +287,9 @@ export default function UsagePage() {
           )}
         </div>
 
-        {/* 模型分布与活跃 Key 排行 */}
-        <div className="space-y-5">
-          <div className="space-y-2.5">
+        {/* 模型分布与活跃 Key 排行：固定 h-72，严格等高 */}
+        <div className="flex flex-col justify-between h-72">
+          <div className="space-y-2">
             <div className="flex items-center gap-2">
               <BarChart3Icon className="size-4 text-brass" />
               <h2 className="text-sm font-medium">{t('usage.topModelsTitle')}</h2>
@@ -286,8 +297,8 @@ export default function UsagePage() {
             {topModels.length === 0 ? (
               <p className="py-2 font-mono text-xs text-muted-foreground">{t('usage.noChartData')}</p>
             ) : (
-              <div className="space-y-2">
-                {topModels.slice(0, 5).map((m, idx) => {
+              <div className="space-y-2 pt-0.5">
+                {topModels.slice(0, 4).map((m, idx) => {
                   const pct = Math.round((m.total_tokens / maxModelTokens) * 100)
                   return (
                     <div key={idx} className="space-y-1">
@@ -305,7 +316,7 @@ export default function UsagePage() {
             )}
           </div>
 
-          <div className="space-y-2.5 pt-3 border-t">
+          <div className="space-y-2 pt-3 border-t">
             <div className="flex items-center gap-2">
               <PieChartIcon className="size-4 text-brass" />
               <h2 className="text-sm font-medium">{t('usage.topKeysTitle')}</h2>
@@ -313,8 +324,8 @@ export default function UsagePage() {
             {topKeys.length === 0 ? (
               <p className="py-2 font-mono text-xs text-muted-foreground">{t('usage.noChartData')}</p>
             ) : (
-              <div className="space-y-2">
-                {topKeys.slice(0, 3).map((k, idx) => {
+              <div className="space-y-2 pt-0.5">
+                {topKeys.slice(0, 2).map((k, idx) => {
                   const pct = Math.round((k.total_tokens / maxKeyTokens) * 100)
                   return (
                     <div key={idx} className="space-y-1">
