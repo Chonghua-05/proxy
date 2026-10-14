@@ -13,6 +13,8 @@ import {
   LanguagesIcon,
   MenuIcon,
   XIcon,
+  CopyIcon,
+  CheckIcon,
 } from 'lucide-react'
 
 import Lockup from '@/components/brand/Lockup'
@@ -23,6 +25,7 @@ import { useTheme } from '@/lib/theme'
 import { useAuth } from '@/context/AuthContext'
 import { useI18n, type TranslationKey } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { getSystemInfo } from '@/api/client'
 
 interface NavDef {
   path: string
@@ -75,12 +78,61 @@ function LanguageToggle() {
   )
 }
 
+function EndpointWidget({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false)
+  const { t } = useI18n()
+  const handleCopy = () => {
+    navigator.clipboard.writeText(url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+  return (
+    <div className="p-3 mx-2 my-2 rounded-lg border bg-card/60 shadow-2xs text-xs space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Base URL</span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted"
+          title={t('common.copy')}
+        >
+          {copied ? (
+            <>
+              <CheckIcon className="size-3 text-emerald-600" />
+              <span className="text-emerald-600">{t('common.copied')}</span>
+            </>
+          ) : (
+            <>
+              <CopyIcon className="size-3" />
+              <span>{t('common.copy')}</span>
+            </>
+          )}
+        </button>
+      </div>
+      <div className="font-mono text-[11px] text-foreground bg-muted/40 p-1.5 rounded select-all break-all border border-border/40">
+        {url}
+      </div>
+    </div>
+  )
+}
+
 export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
   const { logout } = useAuth()
   const { t } = useI18n()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [publicBaseUrl, setPublicBaseUrl] = useState('')
+
+  useEffect(() => {
+    getSystemInfo()
+      .then((info) => {
+        if (info && info.public_base_url) {
+          setPublicBaseUrl(info.public_base_url)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   // 路由跳转时自动关闭移动端抽屉
   useEffect(() => {
@@ -168,6 +220,8 @@ export default function Layout() {
         </nav>
 
         <Separator />
+        {publicBaseUrl && <EndpointWidget url={publicBaseUrl} />}
+
         <div className="p-2 shrink-0">
           <button
             type="button"

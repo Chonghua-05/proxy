@@ -60,6 +60,7 @@ All configuration is via environment variables:
 | `ADDR` | `:8080` | Server listen address |
 | `DSN` | `llm-proxy.db` | SQLite database file path |
 | `ADMIN_TOKEN` | *(required)* | Bearer token for `/admin/*` endpoints and dashboard login |
+| `PUBLIC_BASE_URL` | `""` | Public API base URL displayed on the dashboard (e.g. `https://api.example.com/v1`) |
 
 ## Development
 

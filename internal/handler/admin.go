@@ -20,9 +20,10 @@ type AdminHandler struct {
 	guardrails      *store.GuardrailStore
 	guardrailEvents *store.GuardrailEventStore
 	quotas          *quota.Manager
+	publicBaseURL   string
 }
 
-func NewAdminHandler(p *store.ProviderStore, k *store.APIKeyStore, u *store.UsageStore, g *store.GuardrailStore, ge *store.GuardrailEventStore) *AdminHandler {
+func NewAdminHandler(p *store.ProviderStore, k *store.APIKeyStore, u *store.UsageStore, g *store.GuardrailStore, ge *store.GuardrailEventStore, publicBaseURL string) *AdminHandler {
 	return &AdminHandler{
 		providers:       p,
 		keys:            k,
@@ -30,6 +31,7 @@ func NewAdminHandler(p *store.ProviderStore, k *store.APIKeyStore, u *store.Usag
 		guardrails:      g,
 		guardrailEvents: ge,
 		quotas:          quota.NewManager(),
+		publicBaseURL:   publicBaseURL,
 	}
 }
 
@@ -414,6 +416,16 @@ func (h *AdminHandler) DeleteGuardrailEvent(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+type SystemInfoResp struct {
+	PublicBaseURL string `json:"public_base_url"`
+}
+
+func (h *AdminHandler) GetSystemInfo(c echo.Context) error {
+	return c.JSON(http.StatusOK, SystemInfoResp{
+		PublicBaseURL: h.publicBaseURL,
+	})
 }
 
 func intParam(c echo.Context, name string, def int) int {

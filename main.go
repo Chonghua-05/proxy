@@ -40,7 +40,7 @@ func main() {
 	guardrailEventStore := store.NewGuardrailEventStore(database)
 
 	// Handlers.
-	adminH := handler.NewAdminHandler(providerStore, keyStore, usageStore, guardrailStore, guardrailEventStore)
+	adminH := handler.NewAdminHandler(providerStore, keyStore, usageStore, guardrailStore, guardrailEventStore, cfg.PublicBaseURL)
 	forwarder := proxy.NewForwarder(usageStore, guardrailStore, guardrailEventStore)
 	proxyH := handler.NewProxyHandler(forwarder, providerStore)
 	docsH := handler.NewDocsHandler(specBytes)
@@ -66,6 +66,7 @@ func main() {
 	// ── Admin routes (admin token auth) ────────────────────────────────
 	admin := e.Group("/admin", middleware.AdminAuth(cfg.AdminToken))
 
+	admin.GET("/system/info", adminH.GetSystemInfo)
 	admin.POST("/providers", adminH.CreateProvider)
 	admin.GET("/providers", adminH.ListProviders)
 	admin.GET("/providers/:id", adminH.GetProvider)

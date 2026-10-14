@@ -254,3 +254,13 @@ export function listGuardrailEvents(params?: Record<string, string>): Promise<Gu
 export function deleteGuardrailEvent(id: string): Promise<void> {
   return request(`/guardrail-events/${id}`, { method: 'DELETE' })
 }
+
+// ── System Info ────────────────────────────────────────────────────────
+
+export interface SystemInfo {
+  public_base_url?: string
+}
+
+export function getSystemInfo(): Promise<SystemInfo> {
+  return request('/system/info')
+}

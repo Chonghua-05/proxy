@@ -15,6 +15,8 @@ type Config struct {
 	// SessionSecret is used to sign dashboard session cookies.
 	// Defaults to AdminToken if not set.
 	SessionSecret string
+	// PublicBaseURL is the optional API base URL shown on the dashboard for clients.
+	PublicBaseURL string
 }
 
 // Load reads configuration from environment variables with sensible defaults.
@@ -25,6 +27,7 @@ func Load() Config {
 		DSN:           envOr("DSN", "llm-proxy.db"),
 		AdminToken:    adminToken,
 		SessionSecret: envOr("SESSION_SECRET", adminToken),
+		PublicBaseURL: envOr("PUBLIC_BASE_URL", ""),
 	}
 }
 

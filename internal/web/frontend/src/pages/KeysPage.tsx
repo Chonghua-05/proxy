@@ -26,12 +26,13 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDateTime } from '@/lib/format'
 import { useI18n } from '@/lib/i18n'
-import { listKeys, createKey, updateKey, revokeKey, listProviders, type APIKey, type Provider } from '@/api/client'
+import { listKeys, createKey, updateKey, revokeKey, listProviders, getSystemInfo, type APIKey, type Provider } from '@/api/client'
 
 export default function KeysPage() {
   const { t } = useI18n()
   const [keys, setKeys] = useState<APIKey[]>([])
   const [providers, setProviders] = useState<Provider[]>([])
+  const [publicBaseUrl, setPublicBaseUrl] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [flash, setFlash] = useState('')
@@ -62,10 +63,13 @@ export default function KeysPage() {
     let stale = false
     ;(async () => {
       try {
-        const [k, p] = await Promise.all([listKeys(), listProviders()])
+        const [k, p, sys] = await Promise.all([listKeys(), listProviders(), getSystemInfo().catch(() => null)])
         if (stale) return
         setKeys(k || [])
         setProviders(p || [])
+        if (sys?.public_base_url) {
+          setPublicBaseUrl(sys.public_base_url)
+        }
       } catch (err: unknown) {
         if (!stale) setError(err instanceof Error ? err.message : 'Failed to load data')
       } finally {
@@ -229,6 +233,29 @@ export default function KeysPage() {
           </Button>
         }
       />
+
+      {publicBaseUrl && (
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border bg-card/60 p-3 text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground font-medium">Base URL:</span>
+            <code className="font-mono text-xs text-foreground bg-muted/40 px-2 py-0.5 rounded select-all break-all border border-border/40">
+              {publicBaseUrl}
+            </code>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 font-mono text-xs self-start sm:self-auto gap-1"
+            onClick={() => {
+              navigator.clipboard.writeText(publicBaseUrl)
+              setFlash(t('common.copied'))
+            }}
+          >
+            <CopyIcon className="size-3.5" />
+            <span>{t('common.copy')}</span>
+          </Button>
+        </div>
+      )}
 
       {newKey && (
         <DismissibleAlert
