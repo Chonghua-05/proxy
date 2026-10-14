@@ -252,6 +252,11 @@ type streamChunkUsage struct {
 	Response *struct {
 		Usage *usagePayload `json:"usage"`
 	} `json:"response"`
+	Choices []struct {
+		Delta struct {
+			Content string `json:"content"`
+		} `json:"delta"`
+	} `json:"choices"`
 }
 
 // ForwardChatCompletion handles both streaming and non-streaming chat completions.
@@ -380,6 +385,7 @@ func (f *Forwarder) handleStreaming(
 	w.WriteHeader(resp.StatusCode)
 
 	var totalUsage usagePayload
+	var streamedChars int
 
 	scanner := bufio.NewScanner(resp.Body)
 	// Increase scanner buffer for large chunks.
@@ -399,6 +405,9 @@ func (f *Forwarder) handleStreaming(
 					} else if chunk.Response != nil && chunk.Response.Usage != nil {
 						totalUsage = *chunk.Response.Usage
 					}
+					if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
+						streamedChars += len(chunk.Choices[0].Delta.Content)
+					}
 				}
 			}
 		}
@@ -409,6 +418,14 @@ func (f *Forwarder) handleStreaming(
 
 	// Record usage if we got any.
 	prompt, completion, total := totalUsage.normalize()
+	if total == 0 && streamedChars > 0 {
+		completion = streamedChars / 3
+		if completion < 1 {
+			completion = 1
+		}
+		prompt = 15 // nominal prompt estimation
+		total = prompt + completion
+	}
 	if total > 0 {
 		_ = f.usage.Record(
 			apiKey.ID, provider.ID, model,
