@@ -24,6 +24,10 @@ func NewAPIKeyStore(db *sql.DB) *APIKeyStore {
 // Create generates a new proxy API key. It returns the model (with hash) and
 // the raw key string. The raw key is never stored.
 func (s *APIKeyStore) Create(name, providerID string, rateLimitRPM int) (*models.APIKey, string, error) {
+	return s.CreateWithAllowedProviders(name, providerID, rateLimitRPM, "")
+}
+
+func (s *APIKeyStore) CreateWithAllowedProviders(name, providerID string, rateLimitRPM int, allowedProviders string) (*models.APIKey, string, error) {
 	rawKey, err := generateKey()
 	if err != nil {
 		return nil, "", fmt.Errorf("generate key: %w", err)
@@ -31,17 +35,18 @@ func (s *APIKeyStore) Create(name, providerID string, rateLimitRPM int) (*models
 	hash := hashKey(rawKey)
 
 	k := &models.APIKey{
-		ID:           uuid.New().String(),
-		Name:         name,
-		KeyHash:      hash,
-		ProviderID:   providerID,
-		RateLimitRPM: rateLimitRPM,
-		CreatedAt:    time.Now().UTC(),
+		ID:               uuid.New().String(),
+		Name:             name,
+		KeyHash:          hash,
+		ProviderID:       providerID,
+		AllowedProviders: allowedProviders,
+		RateLimitRPM:     rateLimitRPM,
+		CreatedAt:        time.Now().UTC(),
 	}
 
 	_, err = s.db.Exec(
-		`INSERT INTO api_keys (id, name, key_hash, provider_id, rate_limit_rpm, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-		k.ID, k.Name, k.KeyHash, k.ProviderID, k.RateLimitRPM, k.CreatedAt,
+		`INSERT INTO api_keys (id, name, key_hash, provider_id, allowed_providers, rate_limit_rpm, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		k.ID, k.Name, k.KeyHash, k.ProviderID, k.AllowedProviders, k.RateLimitRPM, k.CreatedAt,
 	)
 	if err != nil {
 		return nil, "", fmt.Errorf("insert api key: %w", err)
@@ -51,7 +56,7 @@ func (s *APIKeyStore) Create(name, providerID string, rateLimitRPM int) (*models
 
 func (s *APIKeyStore) List() ([]models.APIKey, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, key_hash, provider_id, rate_limit_rpm, created_at, revoked_at FROM api_keys ORDER BY created_at DESC`,
+		`SELECT id, name, key_hash, provider_id, allowed_providers, rate_limit_rpm, created_at, revoked_at FROM api_keys ORDER BY created_at DESC`,
 	)
 	if err != nil {
 		return nil, err
@@ -61,7 +66,7 @@ func (s *APIKeyStore) List() ([]models.APIKey, error) {
 	var out []models.APIKey
 	for rows.Next() {
 		var k models.APIKey
-		if err := rows.Scan(&k.ID, &k.Name, &k.KeyHash, &k.ProviderID, &k.RateLimitRPM, &k.CreatedAt, &k.RevokedAt); err != nil {
+		if err := rows.Scan(&k.ID, &k.Name, &k.KeyHash, &k.ProviderID, &k.AllowedProviders, &k.RateLimitRPM, &k.CreatedAt, &k.RevokedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, k)
@@ -74,9 +79,9 @@ func (s *APIKeyStore) Lookup(rawKey string) (*models.APIKey, error) {
 	hash := hashKey(rawKey)
 	var k models.APIKey
 	err := s.db.QueryRow(
-		`SELECT id, name, key_hash, provider_id, rate_limit_rpm, created_at, revoked_at
+		`SELECT id, name, key_hash, provider_id, allowed_providers, rate_limit_rpm, created_at, revoked_at
 		   FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL`, hash,
-	).Scan(&k.ID, &k.Name, &k.KeyHash, &k.ProviderID, &k.RateLimitRPM, &k.CreatedAt, &k.RevokedAt)
+	).Scan(&k.ID, &k.Name, &k.KeyHash, &k.ProviderID, &k.AllowedProviders, &k.RateLimitRPM, &k.CreatedAt, &k.RevokedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -100,6 +105,10 @@ func (s *APIKeyStore) Revoke(id string) error {
 }
 
 func (s *APIKeyStore) Update(id string, name *string, providerID *string, rateLimitRPM *int) (*models.APIKey, error) {
+	return s.UpdateWithAllowedProviders(id, name, providerID, nil, rateLimitRPM)
+}
+
+func (s *APIKeyStore) UpdateWithAllowedProviders(id string, name *string, providerID *string, allowedProviders *string, rateLimitRPM *int) (*models.APIKey, error) {
 	var sets []string
 	var args []interface{}
 
@@ -110,6 +119,10 @@ func (s *APIKeyStore) Update(id string, name *string, providerID *string, rateLi
 	if providerID != nil {
 		sets = append(sets, "provider_id = ?")
 		args = append(args, *providerID)
+	}
+	if allowedProviders != nil {
+		sets = append(sets, "allowed_providers = ?")
+		args = append(args, *allowedProviders)
 	}
 	if rateLimitRPM != nil {
 		sets = append(sets, "rate_limit_rpm = ?")
@@ -137,8 +150,8 @@ func (s *APIKeyStore) Update(id string, name *string, providerID *string, rateLi
 func (s *APIKeyStore) GetByID(id string) (*models.APIKey, error) {
 	var k models.APIKey
 	err := s.db.QueryRow(
-		`SELECT id, name, key_hash, provider_id, rate_limit_rpm, created_at, revoked_at FROM api_keys WHERE id = ?`, id,
-	).Scan(&k.ID, &k.Name, &k.KeyHash, &k.ProviderID, &k.RateLimitRPM, &k.CreatedAt, &k.RevokedAt)
+		`SELECT id, name, key_hash, provider_id, allowed_providers, rate_limit_rpm, created_at, revoked_at FROM api_keys WHERE id = ?`, id,
+	).Scan(&k.ID, &k.Name, &k.KeyHash, &k.ProviderID, &k.AllowedProviders, &k.RateLimitRPM, &k.CreatedAt, &k.RevokedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

@@ -84,7 +84,41 @@ func migrate(db *sql.DB) error {
 	if err := migrateProviderQuota(db); err != nil {
 		return err
 	}
+	if err := migrateAPIKeyAllowedProviders(db); err != nil {
+		return err
+	}
 
+	return nil
+}
+
+// migrateAPIKeyAllowedProviders adds allowed_providers column to api_keys if it does not exist.
+func migrateAPIKeyAllowedProviders(db *sql.DB) error {
+	rows, err := db.Query(`PRAGMA table_info(api_keys)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	hasCol := false
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dfltValue interface{}
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		if name == "allowed_providers" {
+			hasCol = true
+			break
+		}
+	}
+
+	if !hasCol {
+		if _, err := db.Exec(`ALTER TABLE api_keys ADD COLUMN allowed_providers TEXT NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -24,7 +25,7 @@ func NewProxyHandler(f *proxy.Forwarder, p *store.ProviderStore) *ProxyHandler {
 	return &ProxyHandler{forwarder: f, providers: p}
 }
 
-func (h *ProxyHandler) resolveProviderAndRewriteBody(c echo.Context, defaultProvider *models.Provider) (*models.Provider, error) {
+func (h *ProxyHandler) resolveProviderAndRewriteBody(c echo.Context, apiKey *models.APIKey, defaultProvider *models.Provider) (*models.Provider, error) {
 	req := c.Request()
 	if req.Body == nil {
 		return defaultProvider, nil
@@ -65,6 +66,15 @@ func (h *ProxyHandler) resolveProviderAndRewriteBody(c echo.Context, defaultProv
 		if err == nil && p != nil {
 			targetProvider = p
 		}
+	}
+
+	// Enforce provider permission check for this API key
+	if !apiKey.IsProviderAllowed(targetProvider.ID) {
+		if apiKey.AllowedProviders != "" {
+			return nil, echo.NewHTTPError(http.StatusForbidden, fmt.Sprintf("model %q targets provider %q which is not permitted for this API key", modelStr, targetProvider.Name))
+		}
+		// If no explicit allowed_providers list, strictly use defaultProvider
+		targetProvider = defaultProvider
 	}
 
 	// Rewrite model if prefix was stripped
@@ -119,9 +129,9 @@ func (h *ProxyHandler) ChatCompletion(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadGateway, "provider not found for this key")
 	}
 
-	provider, err := h.resolveProviderAndRewriteBody(c, defaultProvider)
+	provider, err := h.resolveProviderAndRewriteBody(c, apiKey, defaultProvider)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "failed to read request body")
+		return err
 	}
 
 	if err := h.forwarder.ForwardChatCompletion(c.Response().Writer, c.Request(), provider, apiKey); err != nil {
@@ -154,9 +164,9 @@ func (h *ProxyHandler) Responses(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadGateway, "provider not found for this key")
 	}
 
-	provider, err := h.resolveProviderAndRewriteBody(c, defaultProvider)
+	provider, err := h.resolveProviderAndRewriteBody(c, apiKey, defaultProvider)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "failed to read request body")
+		return err
 	}
 
 	if err := h.forwarder.ForwardResponses(c.Response().Writer, c.Request(), provider, apiKey); err != nil {
@@ -186,6 +196,18 @@ func (h *ProxyHandler) ListModels(c echo.Context) error {
 		return nil
 	}
 
-	merged := h.forwarder.FetchAndMergeModels(c.Request().Context(), all)
+	// Filter down to only providers permitted for this API key
+	var allowed []models.Provider
+	for _, p := range all {
+		if apiKey.IsProviderAllowed(p.ID) {
+			allowed = append(allowed, p)
+		}
+	}
+
+	if len(allowed) == 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "no allowed providers for this API key")
+	}
+
+	merged := h.forwarder.FetchAndMergeModels(c.Request().Context(), allowed)
 	return c.JSON(http.StatusOK, merged)
 }

@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // Provider represents an upstream LLM provider configuration.
 type Provider struct {
@@ -16,13 +19,32 @@ type Provider struct {
 
 // APIKey represents a proxy API key issued to a client.
 type APIKey struct {
-	ID           string     `json:"id"`
-	Name         string     `json:"name"`
-	KeyHash      string     `json:"-"` // SHA-256 hash stored in DB
-	ProviderID   string     `json:"provider_id"`
-	RateLimitRPM int        `json:"rate_limit_rpm"`
-	CreatedAt    time.Time  `json:"created_at"`
-	RevokedAt    *time.Time `json:"revoked_at,omitempty"`
+	ID               string     `json:"id"`
+	Name             string     `json:"name"`
+	KeyHash          string     `json:"-"` // SHA-256 hash stored in DB
+	ProviderID       string     `json:"provider_id"`
+	AllowedProviders string     `json:"allowed_providers"`
+	RateLimitRPM     int        `json:"rate_limit_rpm"`
+	CreatedAt        time.Time  `json:"created_at"`
+	RevokedAt        *time.Time `json:"revoked_at,omitempty"`
+}
+
+// IsProviderAllowed checks if a provider ID is allowed for this API key.
+// If AllowedProviders is empty, it strictly allows only the primary ProviderID.
+func (k *APIKey) IsProviderAllowed(providerID string) bool {
+	if k.AllowedProviders == "" {
+		return k.ProviderID == providerID
+	}
+	if k.AllowedProviders == "*" {
+		return true
+	}
+	parts := strings.Split(k.AllowedProviders, ",")
+	for _, p := range parts {
+		if strings.TrimSpace(p) == providerID {
+			return true
+		}
+	}
+	return false
 }
 
 // UsageRecord represents a single proxied request's token usage.

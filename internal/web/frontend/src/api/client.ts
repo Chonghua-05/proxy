@@ -116,6 +116,7 @@ export interface APIKey {
   id: string
   name: string
   provider_id: string
+  allowed_providers?: string
   rate_limit_rpm: number
   created_at: string
   revoked_at?: string | null
@@ -126,6 +127,7 @@ export interface CreateKeyResponse {
   name: string
   key: string
   provider_id: string
+  allowed_providers?: string
   rate_limit_rpm: number
   created_at: string
 }
@@ -134,7 +136,7 @@ export function listKeys(): Promise<APIKey[]> {
   return request('/keys')
 }
 
-export function createKey(data: { name: string; provider_id: string; rate_limit_rpm: number }): Promise<CreateKeyResponse> {
+export function createKey(data: { name: string; provider_id: string; allowed_providers?: string; rate_limit_rpm: number }): Promise<CreateKeyResponse> {
   return request('/keys', { method: 'POST', body: JSON.stringify(data) })
 }
 
@@ -142,7 +144,7 @@ export function revokeKey(id: string): Promise<void> {
   return request(`/keys/${id}`, { method: 'DELETE' })
 }
 
-export function updateKey(id: string, data: { name?: string; provider_id?: string; rate_limit_rpm?: number }): Promise<APIKey> {
+export function updateKey(id: string, data: { name?: string; provider_id?: string; allowed_providers?: string; rate_limit_rpm?: number }): Promise<APIKey> {
   return request(`/keys/${id}`, { method: 'PUT', body: JSON.stringify(data) })
 }
 

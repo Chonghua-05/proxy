@@ -163,9 +163,10 @@ func (h *AdminHandler) DeleteProvider(c echo.Context) error {
 // ── API Keys ───────────────────────────────────────────────────────────
 
 type createAPIKeyReq struct {
-	Name         string `json:"name"`
-	ProviderID   string `json:"provider_id"`
-	RateLimitRPM int    `json:"rate_limit_rpm"`
+	Name             string `json:"name"`
+	ProviderID       string `json:"provider_id"`
+	AllowedProviders string `json:"allowed_providers"`
+	RateLimitRPM     int    `json:"rate_limit_rpm"`
 }
 
 func (h *AdminHandler) CreateAPIKey(c echo.Context) error {
@@ -186,18 +187,19 @@ func (h *AdminHandler) CreateAPIKey(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "provider not found")
 	}
 
-	k, rawKey, err := h.keys.Create(req.Name, req.ProviderID, req.RateLimitRPM)
+	k, rawKey, err := h.keys.CreateWithAllowedProviders(req.Name, req.ProviderID, req.RateLimitRPM, req.AllowedProviders)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
 	return c.JSON(http.StatusCreated, map[string]interface{}{
-		"id":             k.ID,
-		"name":           k.Name,
-		"key":            rawKey,
-		"provider_id":    k.ProviderID,
-		"rate_limit_rpm": k.RateLimitRPM,
-		"created_at":     k.CreatedAt,
+		"id":                k.ID,
+		"name":              k.Name,
+		"key":               rawKey,
+		"provider_id":       k.ProviderID,
+		"allowed_providers": k.AllowedProviders,
+		"rate_limit_rpm":    k.RateLimitRPM,
+		"created_at":        k.CreatedAt,
 	})
 }
 
@@ -223,9 +225,10 @@ func (h *AdminHandler) RevokeAPIKey(c echo.Context) error {
 }
 
 type updateAPIKeyReq struct {
-	Name         *string `json:"name"`
-	ProviderID   *string `json:"provider_id"`
-	RateLimitRPM *int    `json:"rate_limit_rpm"`
+	Name             *string `json:"name"`
+	ProviderID       *string `json:"provider_id"`
+	AllowedProviders *string `json:"allowed_providers"`
+	RateLimitRPM     *int    `json:"rate_limit_rpm"`
 }
 
 func (h *AdminHandler) UpdateAPIKey(c echo.Context) error {
@@ -244,7 +247,7 @@ func (h *AdminHandler) UpdateAPIKey(c echo.Context) error {
 		}
 	}
 
-	k, err := h.keys.Update(c.Param("id"), req.Name, req.ProviderID, req.RateLimitRPM)
+	k, err := h.keys.UpdateWithAllowedProviders(c.Param("id"), req.Name, req.ProviderID, req.AllowedProviders, req.RateLimitRPM)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return echo.NewHTTPError(http.StatusNotFound, "api key not found")

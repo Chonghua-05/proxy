@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, type FormEvent } from 'react'
-import { CopyIcon, PlusIcon, Trash2Icon, PencilIcon } from 'lucide-react'
+import { CopyIcon, PlusIcon, Trash2Icon, PencilIcon, LayersIcon } from 'lucide-react'
 
 import PageHeader from '@/components/PageHeader'
 import DismissibleAlert from '@/components/DismissibleAlert'
@@ -44,12 +44,14 @@ export default function KeysPage() {
   // Form states for create
   const [name, setName] = useState('')
   const [providerId, setProviderId] = useState('')
+  const [allowedIds, setAllowedIds] = useState<string[]>([])
   const [rpm, setRpm] = useState('60')
   const [submitting, setSubmitting] = useState(false)
 
   // Form states for edit
   const [editName, setEditName] = useState('')
   const [editProviderId, setEditProviderId] = useState('')
+  const [editAllowedIds, setEditAllowedIds] = useState<string[]>([])
   const [editRpm, setEditRpm] = useState('60')
   const [editSubmitting, setEditSubmitting] = useState(false)
 
@@ -73,6 +75,18 @@ export default function KeysPage() {
     return () => { stale = true }
   }, [reloadTick])
 
+  function toggleAllowedId(id: string, currentList: string[], setter: (val: string[]) => void) {
+    if (currentList.includes(id)) {
+      setter(currentList.filter((item) => item !== id))
+    } else {
+      setter([...currentList, id])
+    }
+  }
+
+  function selectAllProviders(setter: (val: string[]) => void) {
+    setter(providers.map((p) => p.id))
+  }
+
   async function handleCreate(e: FormEvent) {
     e.preventDefault()
     if (!name || !providerId) {
@@ -82,14 +96,17 @@ export default function KeysPage() {
     setSubmitting(true)
     setError('')
     try {
+      const allowedStr = allowedIds.length > 0 ? allowedIds.join(',') : ''
       const result = await createKey({
         name,
         provider_id: providerId,
+        allowed_providers: allowedStr,
         rate_limit_rpm: parseInt(rpm) || 60,
       })
       setNewKey(result.key)
       setName('')
       setProviderId('')
+      setAllowedIds([])
       setRpm('60')
       setModalOpen(false)
       reload()
@@ -104,6 +121,12 @@ export default function KeysPage() {
     setEditingKey(k)
     setEditName(k.name)
     setEditProviderId(k.provider_id)
+    const initialAllowed = k.allowed_providers
+      ? k.allowed_providers === '*'
+        ? providers.map((p) => p.id)
+        : k.allowed_providers.split(',').map((s) => s.trim()).filter(Boolean)
+      : [k.provider_id]
+    setEditAllowedIds(initialAllowed)
     setEditRpm(String(k.rate_limit_rpm))
     setEditModalOpen(true)
   }
@@ -118,9 +141,11 @@ export default function KeysPage() {
     setEditSubmitting(true)
     setError('')
     try {
+      const allowedStr = editAllowedIds.length > 0 ? editAllowedIds.join(',') : ''
       await updateKey(editingKey.id, {
         name: editName,
         provider_id: editProviderId,
+        allowed_providers: allowedStr,
         rate_limit_rpm: parseInt(editRpm) || 60,
       })
       setFlash(t('keys.updatedSuccess'))
@@ -148,6 +173,44 @@ export default function KeysPage() {
     return providers.find((p) => p.id === id)?.name || id.slice(0, 8)
   }
 
+  function renderProviderBadges(k: APIKey) {
+    if (!k.allowed_providers || k.allowed_providers === '') {
+      return (
+        <Badge variant="outline" className="font-mono text-xs">
+          {providerName(k.provider_id)}
+        </Badge>
+      )
+    }
+    if (k.allowed_providers === '*') {
+      return (
+        <Badge variant="secondary" className="border-brass/40 text-brass-ink font-mono text-xs gap-1">
+          <LayersIcon className="size-3" />
+          {t('keys.allProviders')}
+        </Badge>
+      )
+    }
+
+    const ids = k.allowed_providers.split(',').map((s) => s.trim()).filter(Boolean)
+    if (ids.length >= providers.length && providers.length > 1) {
+      return (
+        <Badge variant="secondary" className="border-brass/40 text-brass-ink font-mono text-xs gap-1">
+          <LayersIcon className="size-3" />
+          {t('keys.allProviders')} ({ids.length})
+        </Badge>
+      )
+    }
+
+    return (
+      <div className="flex flex-wrap gap-1">
+        {ids.map((id) => (
+          <Badge key={id} variant="outline" className="font-mono text-[11px]">
+            {providerName(id)}
+          </Badge>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div>
       <PageHeader
@@ -155,7 +218,13 @@ export default function KeysPage() {
         title={t('keys.title')}
         description={t('keys.description')}
         actions={
-          <Button onClick={() => setModalOpen(true)} className="w-full sm:w-auto">
+          <Button onClick={() => {
+            setModalOpen(true)
+            if (providers.length > 0 && !providerId) {
+              setProviderId(providers[0].id)
+              setAllowedIds(providers.map((p) => p.id))
+            }
+          }} className="w-full sm:w-auto">
             <PlusIcon className="size-4" /> {t('keys.create')}
           </Button>
         }
@@ -218,7 +287,7 @@ export default function KeysPage() {
                 <TableRow key={k.id} className="border-b hover:bg-muted/20">
                   <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{k.id.slice(0, 8)}</TableCell>
                   <TableCell className="font-medium whitespace-nowrap">{k.name}</TableCell>
-                  <TableCell className="whitespace-nowrap">{providerName(k.provider_id)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{renderProviderBadges(k)}</TableCell>
                   <TableCell className="text-right font-mono text-xs tabular-nums">{k.rate_limit_rpm}</TableCell>
                   <TableCell className="whitespace-nowrap">
                     {k.revoked_at ? (
@@ -275,8 +344,13 @@ export default function KeysPage() {
               <Input id="key-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('keys.namePlaceholder')} />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="key-provider">{t('keys.provider')}</Label>
-              <Select value={providerId} onValueChange={setProviderId}>
+              <Label htmlFor="key-provider">{t('keys.provider')} (主默认号源)</Label>
+              <Select value={providerId} onValueChange={(val) => {
+                setProviderId(val)
+                if (!allowedIds.includes(val)) {
+                  setAllowedIds([...allowedIds, val])
+                }
+              }}>
                 <SelectTrigger id="key-provider" className="w-full">
                   <SelectValue placeholder={t('keys.selectProvider')} />
                 </SelectTrigger>
@@ -287,6 +361,43 @@ export default function KeysPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Allowed Providers Multi-select */}
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between">
+                <Label>{t('keys.allowedProviders')}</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-[11px] text-muted-foreground"
+                  onClick={() => selectAllProviders(setAllowedIds)}
+                >
+                  {t('keys.allProviders')}
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2 p-2 rounded-md border bg-muted/20">
+                {providers.map((p) => {
+                  const selected = allowedIds.includes(p.id)
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => toggleAllowedId(p.id, allowedIds, setAllowedIds)}
+                      className={`px-2.5 py-1 rounded text-xs font-mono border transition-colors ${
+                        selected
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-card text-muted-foreground border-border hover:bg-muted/40'
+                      }`}
+                    >
+                      {selected ? '✓ ' : '+ '}{p.name}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground">{t('keys.allowedProvidersHint')}</p>
+            </div>
+
             <div className="grid gap-2">
               <Label htmlFor="key-rpm">{t('keys.rateLimit')}</Label>
               <Input id="key-rpm" type="number" value={rpm} onChange={(e) => setRpm(e.target.value)} placeholder={t('keys.rpmPlaceholder')} />
@@ -314,8 +425,13 @@ export default function KeysPage() {
               <Input id="edit-key-name" value={editName} onChange={(e) => setEditName(e.target.value)} />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-key-provider">{t('keys.provider')}</Label>
-              <Select value={editProviderId} onValueChange={setEditProviderId}>
+              <Label htmlFor="edit-key-provider">{t('keys.provider')} (主默认号源)</Label>
+              <Select value={editProviderId} onValueChange={(val) => {
+                setEditProviderId(val)
+                if (!editAllowedIds.includes(val)) {
+                  setEditAllowedIds([...editAllowedIds, val])
+                }
+              }}>
                 <SelectTrigger id="edit-key-provider" className="w-full">
                   <SelectValue placeholder={t('keys.selectProvider')} />
                 </SelectTrigger>
@@ -326,6 +442,43 @@ export default function KeysPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Allowed Providers Multi-select in Edit */}
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between">
+                <Label>{t('keys.allowedProviders')}</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-[11px] text-muted-foreground"
+                  onClick={() => selectAllProviders(setEditAllowedIds)}
+                >
+                  {t('keys.allProviders')}
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2 p-2 rounded-md border bg-muted/20">
+                {providers.map((p) => {
+                  const selected = editAllowedIds.includes(p.id)
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => toggleAllowedId(p.id, editAllowedIds, setEditAllowedIds)}
+                      className={`px-2.5 py-1 rounded text-xs font-mono border transition-colors ${
+                        selected
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-card text-muted-foreground border-border hover:bg-muted/40'
+                      }`}
+                    >
+                      {selected ? '✓ ' : '+ '}{p.name}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground">{t('keys.allowedProvidersHint')}</p>
+            </div>
+
             <div className="grid gap-2">
               <Label htmlFor="edit-key-rpm">{t('keys.rateLimit')}</Label>
               <Input id="edit-key-rpm" type="number" value={editRpm} onChange={(e) => setEditRpm(e.target.value)} />
