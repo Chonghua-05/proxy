@@ -145,3 +145,28 @@ func TestListModels_ProviderNotFound(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, http.StatusBadGateway, he.Code)
 }
+
+func TestRouteModel(t *testing.T) {
+	tests := []struct {
+		input       string
+		wantClean   string
+		wantTarget  string
+	}{
+		{"gemini-4-argon", "gemini-4-argon", "gemini-web"},
+		{"gemini-4", "gemini-4", "gemini-web"},
+		{"argon", "argon", "gemini-web"},
+		{"gemini-3.1-pro", "gemini-3.1-pro", "gemini-web"},
+		{"web/gemini-4-argon", "gemini-4-argon", "gemini-web"},
+		{"web/custom-model", "custom-model", "gemini-web"},
+		{"ag/gemini-3.8-flash-high", "gemini-3.8-flash-high", "antigravity-local"},
+		{"antigravity/claude-sonnet-4-6", "claude-sonnet-4-6", "antigravity-local"},
+		{"gemini-3.8-flash-high", "gemini-3.8-flash-high", "antigravity-local"},
+		{"claude-sonnet-4-6", "claude-sonnet-4-6", "antigravity-local"},
+	}
+
+	for _, tt := range tests {
+		clean, target := routeModel(tt.input)
+		assert.Equal(t, tt.wantClean, clean, "input: %s", tt.input)
+		assert.Equal(t, tt.wantTarget, target, "input: %s", tt.input)
+	}
+}

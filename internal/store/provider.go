@@ -77,6 +77,20 @@ func (s *ProviderStore) GetByID(id string) (*models.Provider, error) {
 	return &p, nil
 }
 
+func (s *ProviderStore) GetByName(name string) (*models.Provider, error) {
+	var p models.Provider
+	err := s.db.QueryRow(
+		`SELECT id, name, base_url, api_key, quota_type, quota_config, created_at, updated_at FROM providers WHERE name = ?`, name,
+	).Scan(&p.ID, &p.Name, &p.BaseURL, &p.APIKey, &p.QuotaType, &p.QuotaConfig, &p.CreatedAt, &p.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
 func (s *ProviderStore) Update(id string, name, baseURL, apiKey *string) (*models.Provider, error) {
 	return s.UpdateWithQuota(id, name, baseURL, apiKey, nil, nil)
 }

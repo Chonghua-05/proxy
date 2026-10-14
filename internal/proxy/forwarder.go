@@ -3,6 +3,7 @@ package proxy
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -493,4 +494,75 @@ func (f *Forwarder) ForwardListModels(
 	w.WriteHeader(resp.StatusCode)
 	_, err = io.Copy(w, resp.Body)
 	return err
+}
+
+// FetchAndMergeModels fetches models from all provided providers concurrently and deduplicates them.
+func (f *Forwarder) FetchAndMergeModels(ctx context.Context, providers []models.Provider) map[string]any {
+	type modelResponse struct {
+		Object string            `json:"object"`
+		Data   []json.RawMessage `json:"data"`
+	}
+
+	var (
+		mu     sync.Mutex
+		seen   = make(map[string]bool)
+		merged = make([]json.RawMessage, 0)
+		wg     sync.WaitGroup
+	)
+
+	client := &http.Client{Timeout: 3 * time.Second}
+
+	for _, p := range providers {
+		wg.Add(1)
+		go func(prov models.Provider) {
+			defer wg.Done()
+			upstreamURL := strings.TrimRight(prov.BaseURL, "/") + "/v1/models"
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, upstreamURL, nil)
+			if err != nil {
+				return
+			}
+			req.Header.Set("Authorization", "Bearer "+prov.APIKey)
+
+			resp, err := client.Do(req)
+			if err != nil {
+				return
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				return
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return
+			}
+
+			var mr modelResponse
+			if err := json.Unmarshal(body, &mr); err != nil {
+				return
+			}
+
+			mu.Lock()
+			for _, item := range mr.Data {
+				var idObj struct {
+					ID string `json:"id"`
+				}
+				if err := json.Unmarshal(item, &idObj); err == nil && idObj.ID != "" {
+					if !seen[idObj.ID] {
+						seen[idObj.ID] = true
+						merged = append(merged, item)
+					}
+				}
+			}
+			mu.Unlock()
+		}(p)
+	}
+
+	wg.Wait()
+
+	return map[string]any{
+		"object": "list",
+		"data":   merged,
+	}
 }
