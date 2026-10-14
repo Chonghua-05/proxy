@@ -50,6 +50,7 @@ func NewManager() *Manager {
 	}
 	m.Register(&AntigravityDriver{})
 	m.Register(&BalanceDriver{})
+	m.Register(NewModelsDriver())
 	return m
 }
 
@@ -65,6 +66,18 @@ func (m *Manager) Fetch(ctx context.Context, p *models.Provider) (*Result, error
 	m.mu.RUnlock()
 
 	if !exists || p.QuotaType == "" || p.QuotaType == "none" {
+		// Fallback: try fetching models list as buckets so users can still see online models
+		if modelsDriver, ok := m.drivers["models"]; ok {
+			res, err := modelsDriver.Fetch(ctx, p)
+			if err == nil && res != nil && len(res.Buckets) > 0 {
+				res.ProviderID = p.ID
+				res.ProviderName = p.Name
+				res.QuotaType = p.QuotaType
+				res.UpdatedAt = time.Now().UTC()
+				return res, nil
+			}
+		}
+
 		return &Result{
 			ProviderID:   p.ID,
 			ProviderName: p.Name,

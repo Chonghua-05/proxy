@@ -224,7 +224,7 @@ export default function QuotasPage() {
                     </div>
                   )}
 
-                  {q.quota_type === 'none' && (
+                  {q.quota_type === 'none' && (!q.buckets || q.buckets.length === 0) && (
                     <div className="py-6 text-center text-xs text-muted-foreground font-mono">
                       当前未启用额度监控。可在模型提供商中将额度驱动设置为对应类型。
                     </div>
