@@ -83,6 +83,10 @@ export function deleteProvider(id: string): Promise<void> {
 
 export interface QuotaBucket {
   model_id: string
+  display_name?: string
+  group_name?: string
+  window?: string
+  models?: string[]
   remaining_fraction?: number
   remaining_percent?: number
   reset_time?: string

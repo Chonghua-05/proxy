@@ -11,11 +11,15 @@ import (
 
 // Bucket represents a quota bucket for a specific model (e.g. Antigravity rate limits).
 type Bucket struct {
-	ModelID           string     `json:"model_id"`
-	RemainingFraction *float64   `json:"remaining_fraction,omitempty"` // 0.0 ~ 1.0
-	RemainingPercent  *float64   `json:"remaining_percent,omitempty"`  // 0.0 ~ 100.0
-	ResetTime         *time.Time `json:"reset_time,omitempty"`
-	ResetTimeFormatted string    `json:"reset_time_formatted,omitempty"`
+	ModelID            string     `json:"model_id"`
+	DisplayName        string     `json:"display_name,omitempty"`
+	GroupName          string     `json:"group_name,omitempty"`
+	Window             string     `json:"window,omitempty"`
+	Models             []string   `json:"models,omitempty"`
+	RemainingFraction  *float64   `json:"remaining_fraction,omitempty"` // 0.0 ~ 1.0
+	RemainingPercent   *float64   `json:"remaining_percent,omitempty"`  // 0.0 ~ 100.0
+	ResetTime          *time.Time `json:"reset_time,omitempty"`
+	ResetTimeFormatted string     `json:"reset_time_formatted,omitempty"`
 }
 
 // Result is the universal quota report for a provider.

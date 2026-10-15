@@ -25,7 +25,7 @@ func setupGuardrailAdminHandler(t *testing.T) (*AdminHandler, *store.GuardrailSt
 	us := store.NewUsageStore(database)
 	gs := store.NewGuardrailStore(database)
 	ges := store.NewGuardrailEventStore(database)
-	h := NewAdminHandler(ps, ks, us, gs, ges)
+	h := NewAdminHandler(ps, ks, us, gs, ges, "https://api.example.com")
 	return h, gs, ges, ps, ks
 }
 

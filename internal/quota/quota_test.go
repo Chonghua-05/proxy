@@ -102,3 +102,76 @@ func TestQuotaManager_AntigravityDriver(t *testing.T) {
 	assert.Equal(t, "gemini-3.8-flash-high", res.Buckets[0].ModelID)
 	assert.Equal(t, 0.85, *res.Buckets[0].RemainingFraction)
 }
+
+
+func TestQuotaManager_AntigravitySummaryDriver(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/v1internal:retrieveUserQuotaSummary", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"groups": []map[string]interface{}{
+				{
+					"displayName": "Gemini Models",
+					"description": "Models within this group: Gemini Flash, Gemini Pro",
+					"buckets": []map[string]interface{}{
+						{
+							"bucketId":          "gemini-weekly",
+							"displayName":       "Weekly Limit Remaining",
+							"window":            "weekly",
+							"remainingFraction": 0.158,
+							"resetTime":         "2026-10-16T04:09:00Z",
+						},
+						{
+							"bucketId":          "gemini-5h",
+							"displayName":       "Five Hour Limit Remaining",
+							"window":            "5h",
+							"remainingFraction": 0.961,
+							"resetTime":         "2026-10-15T23:23:00Z",
+						},
+					},
+				},
+				{
+					"displayName": "Claude and GPT models",
+					"description": "Models within this group: Claude Sonnet, Claude Opus",
+					"buckets": []map[string]interface{}{
+						{
+							"bucketId":          "3p-weekly",
+							"displayName":       "Weekly Limit Remaining",
+							"window":            "weekly",
+							"remainingFraction": 0.986,
+						},
+						{
+							"bucketId":          "3p-5h",
+							"displayName":       "Five Hour Limit Remaining",
+							"window":            "5h",
+							"remainingFraction": 1.0,
+						},
+					},
+				},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	tmpDir := t.TempDir()
+	authPath := filepath.Join(tmpDir, "antigravity-summary-test.json")
+	authContent := `{"client_id":"cid","client_secret":"csec","refresh_token":"rt","access_token":"at","email":"test@example.com"}`
+	require.NoError(t, os.WriteFile(authPath, []byte(authContent), 0600))
+
+	m := NewManager()
+	p := &models.Provider{
+		ID:          "p4",
+		Name:        "ag-summary",
+		QuotaType:   "antigravity",
+		QuotaConfig: `{"auth_file":"` + authPath + `","proxy_url":"direct","base_url":"` + srv.URL + `"}`,
+	}
+
+	res, err := m.Fetch(context.Background(), p)
+	require.NoError(t, err)
+	assert.Equal(t, "warning", res.Status)
+	assert.Equal(t, "test@example.com", res.Account)
+	require.Len(t, res.Buckets, 4)
+	assert.Equal(t, "gemini-weekly", res.Buckets[0].ModelID)
+	assert.Equal(t, "Gemini 周限额", res.Buckets[0].DisplayName)
+	assert.Contains(t, res.Buckets[0].Models, "Gemini Flash")
+}

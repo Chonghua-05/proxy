@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { RotateCwIcon, ServerIcon, CheckCircle2Icon, AlertTriangleIcon, XCircleIcon, HelpCircleIcon } from 'lucide-react'
+import { RotateCwIcon, ServerIcon, CheckCircle2Icon, AlertTriangleIcon, XCircleIcon, HelpCircleIcon, ChevronDownIcon, ChevronUpIcon, LayersIcon } from 'lucide-react'
 
 import PageHeader from '@/components/PageHeader'
 import DismissibleAlert from '@/components/DismissibleAlert'
@@ -52,6 +52,7 @@ function StatusBadge({ status }: { status: QuotaResult['status'] }) {
 }
 
 function BucketProgressBar({ bucket }: { bucket: QuotaBucket }) {
+  const [expanded, setExpanded] = useState(false)
   const pct = bucket.remaining_percent ?? (bucket.remaining_fraction !== undefined ? bucket.remaining_fraction * 100 : null)
   let barColor = 'bg-primary'
   if (pct !== null) {
@@ -60,26 +61,62 @@ function BucketProgressBar({ bucket }: { bucket: QuotaBucket }) {
     else barColor = 'bg-emerald-500'
   }
 
+  const title = bucket.display_name || bucket.model_id
+  const hasModels = bucket.models && bucket.models.length > 0
+
   return (
-    <div className="flex flex-col gap-1.5 p-3 rounded-lg border border-border/40 bg-card/60">
+    <div className="flex flex-col gap-2 p-3.5 rounded-lg border border-border/50 bg-card/70 hover:bg-card/90 transition-colors">
       <div className="flex items-center justify-between text-xs font-mono">
-        <span className="font-semibold text-foreground truncate max-w-[200px]" title={bucket.model_id}>
-          {bucket.model_id}
-        </span>
-        <span className="font-medium text-foreground">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="font-semibold text-foreground truncate" title={bucket.model_id}>
+            {title}
+          </span>
+          {bucket.window && (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 uppercase shrink-0 font-normal">
+              {bucket.window === 'weekly' ? '周度' : bucket.window === '5h' ? '5小时' : bucket.window}
+            </Badge>
+          )}
+        </div>
+        <span className="font-bold text-sm tracking-tight text-foreground ml-2 shrink-0">
           {pct !== null ? `${pct.toFixed(1)}%` : '—'}
         </span>
       </div>
-      <div className="h-1.5 w-full rounded-full bg-muted/60 overflow-hidden">
+
+      <div className="h-2 w-full rounded-full bg-muted/60 overflow-hidden">
         <div
           className={cn('h-full transition-all duration-300 rounded-full', barColor)}
           style={{ width: `${Math.min(100, Math.max(0, pct ?? 0))}%` }}
         />
       </div>
-      {bucket.reset_time_formatted && (
-        <div className="text-[11px] text-muted-foreground flex justify-between font-mono">
-          <span>重置时间</span>
-          <span>{bucket.reset_time_formatted}</span>
+
+      <div className="text-[11px] text-muted-foreground flex items-center justify-between font-mono pt-0.5">
+        <span>重置时间</span>
+        <span>{bucket.reset_time_formatted || '—'}</span>
+      </div>
+
+      {hasModels && (
+        <div className="pt-1 border-t border-border/30 mt-0.5">
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center justify-between w-full text-[11px] font-mono text-muted-foreground hover:text-foreground transition-colors py-0.5"
+          >
+            <span className="flex items-center gap-1">
+              <LayersIcon className="size-3 text-brass" />
+              <span>涵盖模型 ({bucket.models?.length})</span>
+            </span>
+            {expanded ? <ChevronUpIcon className="size-3" /> : <ChevronDownIcon className="size-3" />}
+          </button>
+
+          {expanded && (
+            <div className="flex flex-wrap gap-1.5 pt-2">
+              {bucket.models?.map((m) => (
+                <Badge key={m} variant="outline" className="text-[10px] bg-background/60 font-mono font-normal">
+                  {m}
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -213,10 +250,11 @@ export default function QuotasPage() {
 
                   {q.buckets && q.buckets.length > 0 && (
                     <div className="space-y-2.5">
-                      <div className="text-xs font-mono font-medium text-muted-foreground">
-                        {t('quotas.modelQuota')} ({q.buckets.length})
+                      <div className="flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
+                        <span>{t('quotas.modelQuota')} ({q.buckets.length})</span>
+                        <span className="text-[11px] text-muted-foreground/80">点击条目可查看涵盖模型</span>
                       </div>
-                      <div className="grid gap-2 sm:grid-cols-2">
+                      <div className="grid gap-2.5 sm:grid-cols-2">
                         {q.buckets.map((b) => (
                           <BucketProgressBar key={b.model_id} bucket={b} />
                         ))}
@@ -232,9 +270,9 @@ export default function QuotasPage() {
                 </CardContent>
               </div>
 
-              <div className="px-6 py-2.5 border-t border-border/30 font-mono text-[11px] text-muted-foreground flex justify-between">
-                <span>更新时间</span>
-                <span>{new Date(q.updated_at).toLocaleTimeString()}</span>
+              <div className="px-6 py-3 border-t border-border/30 bg-muted/10 text-[11px] font-mono text-muted-foreground/70 flex justify-between items-center">
+                <span>更新时间: {new Date(q.updated_at).toLocaleTimeString()}</span>
+                <span className="capitalize">驱动: {q.quota_type}</span>
               </div>
             </Card>
           ))}

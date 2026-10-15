@@ -58,6 +58,7 @@ export default function UsagePage() {
   const [filterEnd, setFilterEnd] = useState('')
   const [page, setPage] = useState(1)
   const [rankingTab, setRankingTab] = useState<'keys' | 'models'>('keys')
+  const [chartRange, setChartRange] = useState<'7d' | '14d' | '30d' | 'all'>('7d')
   const perPage = 50
 
   const [refreshTick, setRefreshTick] = useState(0)
@@ -127,7 +128,27 @@ export default function UsagePage() {
     setPage(1)
   }
 
-  const timeline = summary?.timeline || []
+  const rawTimeline = summary?.timeline || []
+  
+  // 根据 chartRange 过滤最近 N 天，隐藏更早数据，防止图表撑爆溢出
+  const timeline = (() => {
+    if (chartRange === 'all' || rawTimeline.length === 0) return rawTimeline
+    const days = chartRange === '7d' ? 7 : chartRange === '14d' ? 14 : 30
+    const now = new Date()
+    const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
+    
+    const filtered = rawTimeline.filter((tp) => {
+      // timestamp 格式可能是 "2026-10-15 11:00" 或 ISO
+      const t = new Date(tp.timestamp.replace(' ', 'T'))
+      return isNaN(t.getTime()) || t >= cutoff
+    })
+    // 如果筛选后数据较少，至少保留最新 20 个点以防空白
+    if (filtered.length < 5 && rawTimeline.length >= 5) {
+      return rawTimeline.slice(-20)
+    }
+    return filtered
+  })()
+
   const maxTokens = Math.max(1, ...timeline.map((tp) => tp.total_tokens))
 
   const topModels = summary?.top_models || []
@@ -229,16 +250,36 @@ export default function UsagePage() {
 
       {/* 图表区 */}
       <div className="grid grid-cols-1 gap-8 pb-6 border-b lg:grid-cols-3">
-        {/* 柱状时序走势：高度 h-56 */}
-        <div className="lg:col-span-2 flex flex-col justify-between h-56">
-          <div className="flex items-center justify-between shrink-0 mb-1">
-            <div className="flex items-center gap-2">
-              <TrendingUpIcon className="size-4 text-brass" />
-              <h2 className="text-sm font-medium">{t('usage.timelineTitle')}</h2>
+        {/* 柱状时序走势：高度 h-56，自适应防溢出 */}
+        <div className="lg:col-span-2 flex flex-col justify-between h-56 min-w-0">
+          <div className="flex items-center justify-between shrink-0 mb-1 gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <TrendingUpIcon className="size-4 text-brass shrink-0" />
+              <h2 className="text-sm font-medium truncate">{t('usage.timelineTitle')}</h2>
             </div>
-            <span className="font-mono text-xs text-muted-foreground">
-              {timeline.length} {t('usage.requestsTrend')}
-            </span>
+            
+            <div className="flex items-center gap-2 shrink-0">
+              {/* 快速范围切换按钮组 */}
+              <div className="flex items-center gap-0.5 p-0.5 bg-muted/40 rounded-md text-[11px] font-mono">
+                {(['7d', '14d', '30d', 'all'] as const).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setChartRange(r)}
+                    className={`px-1.5 py-0.5 rounded transition-all ${
+                      chartRange === r
+                        ? 'bg-card text-foreground font-semibold shadow-2xs'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {r === '7d' ? '近7天' : r === '14d' ? '近14天' : r === '30d' ? '近30天' : '全部'}
+                  </button>
+                ))}
+              </div>
+              <span className="font-mono text-xs text-muted-foreground hidden sm:inline">
+                {timeline.length} {t('usage.requestsTrend')}
+              </span>
+            </div>
           </div>
 
           {timeline.length === 0 ? (
@@ -246,8 +287,8 @@ export default function UsagePage() {
               {t('usage.noChartData')}
             </div>
           ) : (
-            <div className="flex flex-1 flex-col justify-between pt-1">
-              <div className="relative flex-1 flex items-end">
+            <div className="flex flex-1 flex-col justify-between pt-1 min-w-0 overflow-hidden">
+              <div className="relative flex-1 flex items-end min-w-0 overflow-hidden">
                 {/* 背景水平参考线 */}
                 <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-30">
                   <div className="border-b border-dashed border-border w-full" />
@@ -255,14 +296,14 @@ export default function UsagePage() {
                   <div className="border-b border-border w-full" />
                 </div>
 
-                {/* 柱状图 */}
-                <div className="relative z-10 flex w-full h-full items-end gap-1.5 px-1">
+                {/* 柱状图：自适应 flex 均分并防止任何超出 */}
+                <div className="relative z-10 flex w-full h-full items-end gap-1 px-1 min-w-0 overflow-hidden">
                   {timeline.map((tp, idx) => {
                     const heightPct = Math.max(8, Math.round((tp.total_tokens / maxTokens) * 100))
                     return (
                       <div
                         key={idx}
-                        className="group relative flex flex-1 min-w-[10px] flex-col items-center justify-end h-full"
+                        className="group relative flex flex-1 min-w-0 flex-col items-center justify-end h-full"
                       >
                         <div className="absolute -top-12 z-20 hidden whitespace-nowrap rounded-md bg-popover px-2.5 py-1.5 font-mono text-[11px] shadow-lg border text-popover-foreground group-hover:flex flex-col items-center pointer-events-none">
                           <span className="text-muted-foreground">{tp.timestamp}</span>
@@ -278,10 +319,11 @@ export default function UsagePage() {
                 </div>
               </div>
 
-              {/* 平整的时间刻度 */}
-              <div className="mt-2 flex justify-between border-t pt-1.5 font-mono text-[10px] text-muted-foreground/80 shrink-0">
+              {/* 平整的时间刻度：动态自适应坐标轴 */}
+              <div className="mt-2 flex justify-between border-t pt-1.5 font-mono text-[10px] text-muted-foreground/80 shrink-0 select-none">
                 <span>{timeline[0]?.timestamp.slice(5)}</span>
-                {timeline.length > 4 && <span>{timeline[Math.floor(timeline.length / 2)]?.timestamp.slice(5)}</span>}
+                {timeline.length > 6 && <span>{timeline[Math.floor(timeline.length / 3)]?.timestamp.slice(5)}</span>}
+                {timeline.length > 6 && <span>{timeline[Math.floor((timeline.length * 2) / 3)]?.timestamp.slice(5)}</span>}
                 <span>{timeline[timeline.length - 1]?.timestamp.slice(5)}</span>
               </div>
             </div>

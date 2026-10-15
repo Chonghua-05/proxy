@@ -17,6 +17,8 @@ import (
 	"github.com/lab34/llm-proxy/internal/models"
 )
 
+
+
 type AntigravityDriver struct{}
 
 func (d *AntigravityDriver) Type() string {
@@ -36,6 +38,21 @@ type antigravityAuthJSON struct {
 	RefreshToken string `json:"refresh_token"`
 	AccessToken  string `json:"access_token"`
 	Email        string `json:"email"`
+}
+
+type userQuotaSummaryResponse struct {
+	Groups []struct {
+		DisplayName string `json:"displayName"`
+		Description string `json:"description"`
+		Buckets     []struct {
+			BucketID          string   `json:"bucketId"`
+			DisplayName       string   `json:"displayName"`
+			Window            string   `json:"window"`
+			ResetTime         string   `json:"resetTime"`
+			Description       string   `json:"description"`
+			RemainingFraction *float64 `json:"remainingFraction"`
+		} `json:"buckets"`
+	} `json:"groups"`
 }
 
 type userQuotaResponse struct {
@@ -77,6 +94,16 @@ func (d *AntigravityDriver) Fetch(ctx context.Context, p *models.Provider) (*Res
 		return nil, fmt.Errorf("parse auth file: %w", err)
 	}
 
+	clientID := auth.ClientID
+	if clientID == "" {
+		clientID = os.Getenv("ANTIGRAVITY_CLIENT_ID")
+	}
+
+	clientSecret := auth.ClientSecret
+	if clientSecret == "" {
+		clientSecret = os.Getenv("ANTIGRAVITY_CLIENT_SECRET")
+	}
+
 	httpClient := &http.Client{Timeout: 30 * time.Second}
 	proxyURLStr := cfg.ProxyURL
 	if proxyURLStr == "" {
@@ -95,20 +122,15 @@ func (d *AntigravityDriver) Fetch(ctx context.Context, p *models.Provider) (*Res
 		}
 	}
 
-	// 1. Try querying with existing access token
-	respData, err := queryUserQuota(ctx, httpClient, cfg.BaseURL, auth.AccessToken, cfg.Project)
-	if err != nil || len(respData.Buckets) == 0 {
-		// 2. Refresh token if expired or empty
-		newToken, refErr := refreshGoogleToken(ctx, httpClient, auth.ClientID, auth.ClientSecret, auth.RefreshToken)
-		if refErr != nil {
-			if err != nil {
-				return nil, fmt.Errorf("query failed (%v) and refresh failed (%v)", err, refErr)
-			}
-			return nil, fmt.Errorf("token refresh failed: %w", refErr)
-		}
-		respData, err = queryUserQuota(ctx, httpClient, cfg.BaseURL, newToken, cfg.Project)
-		if err != nil {
-			return nil, fmt.Errorf("query quota after refresh: %w", err)
+	// 1. Try querying summary with existing access token
+	curToken := auth.AccessToken
+	summaryData, sErr := queryUserQuotaSummary(ctx, httpClient, cfg.BaseURL, curToken, cfg.Project)
+	if isAuthError(sErr) {
+		// Token expired or invalid, refresh it
+		newToken, refErr := refreshGoogleToken(ctx, httpClient, clientID, clientSecret, auth.RefreshToken)
+		if refErr == nil && newToken != "" {
+			curToken = newToken
+			summaryData, sErr = queryUserQuotaSummary(ctx, httpClient, cfg.BaseURL, curToken, cfg.Project)
 		}
 	}
 
@@ -116,49 +138,123 @@ func (d *AntigravityDriver) Fetch(ctx context.Context, p *models.Provider) (*Res
 	var buckets []Bucket
 	minFraction := 1.0
 
-	for _, b := range respData.Buckets {
-		var pct *float64
-		if b.RemainingFraction != nil {
-			v := *b.RemainingFraction * 100
-			pct = &v
-			if *b.RemainingFraction < minFraction {
-				minFraction = *b.RemainingFraction
+	// If retrieveUserQuotaSummary succeeded, construct clean categorized buckets
+	if sErr == nil && summaryData != nil && len(summaryData.Groups) > 0 {
+		for _, g := range summaryData.Groups {
+			isGemini := strings.Contains(strings.ToLower(g.DisplayName), "gemini")
+			groupLabel := "Claude/GPT"
+			defaultModels := []string{"Claude Sonnet 3.7 / 3.5", "Claude Opus 3.7 / 3.5", "GPT-OSS 120B"}
+			if isGemini {
+				groupLabel = "Gemini"
+				defaultModels = []string{"Gemini 3.8 Flash / Pro", "Gemini 3.7 Flash", "Gemini 3.6 / 3.1", "Gemini Pro Agent"}
+			}
+
+			// Parse models description if available (e.g. "Models within this group: ...")
+			modelsList := defaultModels
+			if strings.Contains(g.Description, ":") {
+				parts := strings.Split(g.Description, ":")
+				if len(parts) > 1 {
+					items := strings.Split(parts[1], ",")
+					var parsed []string
+					for _, it := range items {
+						trimmed := strings.TrimSpace(it)
+						if trimmed != "" {
+							parsed = append(parsed, trimmed)
+						}
+					}
+					if len(parsed) > 0 {
+						modelsList = parsed
+					}
+				}
+			}
+
+			for _, b := range g.Buckets {
+				var pct *float64
+				if b.RemainingFraction != nil {
+					v := *b.RemainingFraction * 100
+					pct = &v
+					if *b.RemainingFraction < minFraction {
+						minFraction = *b.RemainingFraction
+					}
+				}
+
+				var resetT *time.Time
+				var resetFmt string
+				if b.ResetTime != "" {
+					t, err := time.Parse(time.RFC3339, b.ResetTime)
+					if err == nil {
+						resetT = &t
+						resetFmt = t.In(cstLoc).Format("01-02 15:04")
+					} else {
+						resetFmt = b.ResetTime
+					}
+				}
+
+				dispName := fmt.Sprintf("%s 额度", groupLabel)
+				if b.Window == "weekly" || strings.Contains(b.BucketID, "weekly") {
+					dispName = fmt.Sprintf("%s 周限额", groupLabel)
+				} else if b.Window == "5h" || strings.Contains(b.BucketID, "5h") {
+					dispName = fmt.Sprintf("%s 5小时额度", groupLabel)
+				}
+
+				buckets = append(buckets, Bucket{
+					ModelID:            b.BucketID,
+					DisplayName:        dispName,
+					GroupName:          groupLabel,
+					Window:             b.Window,
+					Models:             modelsList,
+					RemainingFraction:  b.RemainingFraction,
+					RemainingPercent:   pct,
+					ResetTime:          resetT,
+					ResetTimeFormatted: resetFmt,
+				})
 			}
 		}
-
-		var resetT *time.Time
-		var resetFmt string
-		if b.ResetTime != "" {
-			t, err := time.Parse(time.RFC3339, b.ResetTime)
-			if err == nil {
-				resetT = &t
-				resetFmt = t.In(cstLoc).Format("01-02 15:04")
-			} else {
-				resetFmt = b.ResetTime
+	} else {
+		// Fallback to legacy retrieveUserQuota if summary endpoint is totally unavailable
+		legacyData, lErr := queryUserQuota(ctx, httpClient, cfg.BaseURL, curToken, cfg.Project)
+		if isAuthError(lErr) {
+			newToken, refErr := refreshGoogleToken(ctx, httpClient, clientID, clientSecret, auth.RefreshToken)
+			if refErr == nil && newToken != "" {
+				curToken = newToken
+				legacyData, lErr = queryUserQuota(ctx, httpClient, cfg.BaseURL, curToken, cfg.Project)
 			}
 		}
+		if lErr != nil {
+			return nil, fmt.Errorf("fetch quota failed: summary: %v, legacy: %v", sErr, lErr)
+		}
+		for _, b := range legacyData.Buckets {
+			var pct *float64
+			if b.RemainingFraction != nil {
+				v := *b.RemainingFraction * 100
+				pct = &v
+				if *b.RemainingFraction < minFraction {
+					minFraction = *b.RemainingFraction
+				}
+			}
 
-		buckets = append(buckets, Bucket{
-			ModelID:           b.ModelID,
-			RemainingFraction: b.RemainingFraction,
-			RemainingPercent:  pct,
-			ResetTime:         resetT,
-			ResetTimeFormatted: resetFmt,
-		})
+			var resetT *time.Time
+			var resetFmt string
+			if b.ResetTime != "" {
+				t, err := time.Parse(time.RFC3339, b.ResetTime)
+				if err == nil {
+					resetT = &t
+					resetFmt = t.In(cstLoc).Format("01-02 15:04")
+				} else {
+					resetFmt = b.ResetTime
+				}
+			}
+
+			buckets = append(buckets, Bucket{
+				ModelID:            b.ModelID,
+				DisplayName:        b.ModelID,
+				RemainingFraction:  b.RemainingFraction,
+				RemainingPercent:   pct,
+				ResetTime:          resetT,
+				ResetTimeFormatted: resetFmt,
+			})
+		}
 	}
-
-	// Sort buckets by remaining fraction ascending (lowest quota first)
-	sort.Slice(buckets, func(i, j int) bool {
-		f1 := 999.0
-		if buckets[i].RemainingFraction != nil {
-			f1 = *buckets[i].RemainingFraction
-		}
-		f2 := 999.0
-		if buckets[j].RemainingFraction != nil {
-			f2 = *buckets[j].RemainingFraction
-		}
-		return f1 < f2
-	})
 
 	status := "ok"
 	if minFraction < 0.2 {
@@ -174,6 +270,46 @@ func (d *AntigravityDriver) Fetch(ctx context.Context, p *models.Provider) (*Res
 		Buckets:   buckets,
 		UpdatedAt: time.Now().UTC(),
 	}, nil
+}
+
+func queryUserQuotaSummary(ctx context.Context, client *http.Client, baseURL, token, project string) (*userQuotaSummaryResponse, error) {
+	if token == "" {
+		return nil, fmt.Errorf("empty access token")
+	}
+	if baseURL == "" {
+		baseURL = "https://cloudcode-pa.googleapis.com"
+	}
+	endpoint := strings.TrimRight(baseURL, "/") + "/v1internal:retrieveUserQuotaSummary"
+	payload, _ := json.Marshal(map[string]string{"project": project})
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		endpoint,
+		bytes.NewReader(payload),
+	)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "antigravity/2.21.1 linux/amd64")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("status %d: %s", resp.StatusCode, string(b))
+	}
+
+	var data userQuotaSummaryResponse
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, err
+	}
+	return &data, nil
 }
 
 func queryUserQuota(ctx context.Context, client *http.Client, baseURL, token, project string) (*userQuotaResponse, error) {
@@ -252,4 +388,12 @@ func refreshGoogleToken(ctx context.Context, client *http.Client, clientID, clie
 		return "", fmt.Errorf("oauth error: %s (%s)", res.Error, res.Description)
 	}
 	return res.AccessToken, nil
+}
+
+func isAuthError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "status 401") || strings.Contains(msg, "unauthenticated") || strings.Contains(msg, "empty access token")
 }
