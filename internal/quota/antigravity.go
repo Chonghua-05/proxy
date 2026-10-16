@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/lab34/llm-proxy/internal/models"
@@ -98,6 +99,108 @@ var (
 	}
 )
 
+// antigravityQuotaHosts lists the Cloud Code Assist environments in preference
+// order. Google binds personal ("personal_consumer", gcpManaged=false) accounts to
+// the daily host, which is where their usage is accounted; enterprise/PayGo
+// accounts are accounted on production. A host whose response carries no Gemini
+// group is skipped, so an account bound either way resolves to the ledger that
+// actually moves.
+var antigravityQuotaHosts = []string{
+	"https://daily-cloudcode-pa.googleapis.com",
+	"https://daily-cloudcode-pa.sandbox.googleapis.com",
+	"https://cloudcode-pa.googleapis.com",
+}
+
+var (
+	httpClientMu sync.Mutex
+	httpClients  = make(map[string]*http.Client)
+)
+
+// sharedHTTPClient caches one client per proxy URL so repeated refreshes reuse the
+// pooled connections. Building a fresh transport every call redoes the SOCKS+TLS
+// handshake, which measured 1.1-6.0s through the US exit.
+func sharedHTTPClient(proxyURL string) *http.Client {
+	httpClientMu.Lock()
+	defer httpClientMu.Unlock()
+	if c, ok := httpClients[proxyURL]; ok {
+		return c
+	}
+	c := &http.Client{Timeout: 30 * time.Second}
+	if proxyURL != "" && proxyURL != "direct" && proxyURL != "none" {
+		if u, err := url.Parse(proxyURL); err == nil {
+			c.Transport = &http.Transport{
+				Proxy:               http.ProxyURL(u),
+				MaxIdleConns:        8,
+				IdleConnTimeout:     90 * time.Second,
+				TLSHandshakeTimeout: 20 * time.Second,
+			}
+		}
+	}
+	httpClients[proxyURL] = c
+	return c
+}
+
+func resolveProxyURL(configured string) string {
+	if configured != "" {
+		return configured
+	}
+	if env := os.Getenv("ANTIGRAVITY_PROXY_URL"); env != "" {
+		return env
+	}
+	return "socks5://127.0.0.1:1081"
+}
+
+// queryQuotaSummary walks the candidate hosts and returns the first response that
+// reports the Gemini group, falling back to the first valid response when none does.
+func queryQuotaSummary(ctx context.Context, client *http.Client, hosts []string, token, project string) (*userQuotaSummaryResponse, error) {
+	var firstValid *userQuotaSummaryResponse
+	var lastErr error
+	for _, host := range hosts {
+		data, err := queryUserQuotaSummary(ctx, client, host, token, project)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if firstValid == nil {
+			firstValid = data
+		}
+		if hasGeminiGroup(data) {
+			return data, nil
+		}
+	}
+	if firstValid != nil {
+		return firstValid, nil
+	}
+	return nil, lastErr
+}
+
+func hasGeminiGroup(resp *userQuotaSummaryResponse) bool {
+	if resp == nil {
+		return false
+	}
+	for _, g := range resp.Groups {
+		if len(g.Buckets) > 0 && strings.Contains(strings.ToLower(g.DisplayName), "gemini") {
+			return true
+		}
+	}
+	return false
+}
+
+func queryQuotaLegacy(ctx context.Context, client *http.Client, hosts []string, token, project string) (*userQuotaResponse, error) {
+	var lastErr error
+	for _, host := range hosts {
+		data, err := queryUserQuota(ctx, client, host, token, project)
+		if err == nil && len(data.Buckets) > 0 {
+			return data, nil
+		}
+		if err == nil {
+			err = fmt.Errorf("%s returned no buckets", host)
+		}
+		lastErr = err
+	}
+	return nil, lastErr
+}
+
 func (d *AntigravityDriver) Fetch(ctx context.Context, p *models.Provider) (*Result, error) {
 	var cfg antigravityConfig
 	if p.QuotaConfig != "" {
@@ -139,33 +242,22 @@ func (d *AntigravityDriver) Fetch(ctx context.Context, p *models.Provider) (*Res
 		clientSecret = os.Getenv("ANTIGRAVITY_CLIENT_SECRET")
 	}
 
-	httpClient := &http.Client{Timeout: 30 * time.Second}
-	proxyURLStr := cfg.ProxyURL
-	if proxyURLStr == "" {
-		if env := os.Getenv("ANTIGRAVITY_PROXY_URL"); env != "" {
-			proxyURLStr = env
-		} else {
-			proxyURLStr = "socks5://127.0.0.1:1081"
-		}
-	}
-	if proxyURLStr != "" && proxyURLStr != "direct" && proxyURLStr != "none" {
-		u, err := url.Parse(proxyURLStr)
-		if err == nil {
-			httpClient.Transport = &http.Transport{
-				Proxy: http.ProxyURL(u),
-			}
-		}
+	httpClient := sharedHTTPClient(resolveProxyURL(cfg.ProxyURL))
+
+	hosts := antigravityQuotaHosts
+	if cfg.BaseURL != "" {
+		hosts = []string{cfg.BaseURL}
 	}
 
 	// 1. Try querying summary with existing access token
 	curToken := auth.AccessToken
-	summaryData, sErr := queryUserQuotaSummary(ctx, httpClient, cfg.BaseURL, curToken, cfg.Project)
+	summaryData, sErr := queryQuotaSummary(ctx, httpClient, hosts, curToken, cfg.Project)
 	if isAuthError(sErr) {
 		// Token expired or invalid, refresh it
 		newToken, refErr := refreshGoogleToken(ctx, httpClient, clientID, clientSecret, auth.RefreshToken)
 		if refErr == nil && newToken != "" {
 			curToken = newToken
-			summaryData, sErr = queryUserQuotaSummary(ctx, httpClient, cfg.BaseURL, curToken, cfg.Project)
+			summaryData, sErr = queryQuotaSummary(ctx, httpClient, hosts, curToken, cfg.Project)
 		}
 	}
 
@@ -240,12 +332,12 @@ func (d *AntigravityDriver) Fetch(ctx context.Context, p *models.Provider) (*Res
 		}
 	} else {
 		// Fallback to legacy retrieveUserQuota if summary endpoint is totally unavailable
-		legacyData, lErr := queryUserQuota(ctx, httpClient, cfg.BaseURL, curToken, cfg.Project)
+		legacyData, lErr := queryQuotaLegacy(ctx, httpClient, hosts, curToken, cfg.Project)
 		if isAuthError(lErr) {
 			newToken, refErr := refreshGoogleToken(ctx, httpClient, clientID, clientSecret, auth.RefreshToken)
 			if refErr == nil && newToken != "" {
 				curToken = newToken
-				legacyData, lErr = queryUserQuota(ctx, httpClient, cfg.BaseURL, curToken, cfg.Project)
+				legacyData, lErr = queryQuotaLegacy(ctx, httpClient, hosts, curToken, cfg.Project)
 			}
 		}
 		if lErr != nil {
