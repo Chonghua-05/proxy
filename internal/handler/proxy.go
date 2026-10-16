@@ -133,8 +133,8 @@ func routeModel(model string) (cleanModel string, targetProviderName string) {
 		return model, "opencode-free"
 	}
 
-	// Default to antigravity
-	return model, "antigravity-local"
+	// Default to key's defaultProvider
+	return model, ""
 }
 
 func (h *ProxyHandler) ChatCompletion(c echo.Context) error {

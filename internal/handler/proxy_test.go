@@ -165,8 +165,8 @@ func TestRouteModel(t *testing.T) {
 		{"big-pickle", "big-pickle", "opencode-free"},
 		{"ag/gemini-3.8-flash-high", "gemini-3.8-flash-high", "antigravity-local"},
 		{"antigravity/claude-sonnet-4-6", "claude-sonnet-4-6", "antigravity-local"},
-		{"gemini-3.8-flash-high", "gemini-3.8-flash-high", "antigravity-local"},
-		{"claude-sonnet-4-6", "claude-sonnet-4-6", "antigravity-local"},
+		{"gemini-3.8-flash-high", "gemini-3.8-flash-high", ""},
+		{"claude-sonnet-4-6", "claude-sonnet-4-6", ""},
 	}
 
 	for _, tt := range tests {
