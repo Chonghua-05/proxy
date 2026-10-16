@@ -102,6 +102,15 @@ func routeModel(model string) (cleanModel string, targetProviderName string) {
 	if strings.HasPrefix(model, "antigravity/") {
 		return strings.TrimPrefix(model, "antigravity/"), "antigravity-local"
 	}
+	if strings.HasPrefix(model, "opencode/") {
+		return strings.TrimPrefix(model, "opencode/"), "opencode-free"
+	}
+	if strings.HasPrefix(model, "zen/") {
+		return strings.TrimPrefix(model, "zen/"), "opencode-free"
+	}
+	if strings.HasPrefix(model, "free/") {
+		return strings.TrimPrefix(model, "free/"), "opencode-free"
+	}
 
 	// 2. Heuristic model matching
 	lower := strings.ToLower(model)
@@ -109,6 +118,19 @@ func routeModel(model string) (cleanModel string, targetProviderName string) {
 		strings.HasPrefix(lower, "argon") ||
 		strings.HasPrefix(lower, "gemini-3.1-pro") {
 		return model, "gemini-web"
+	}
+
+	if strings.HasSuffix(lower, "-free") ||
+		strings.HasPrefix(lower, "deepseek") ||
+		strings.HasPrefix(lower, "mimo") ||
+		strings.HasPrefix(lower, "nemotron") ||
+		strings.HasPrefix(lower, "longcat") ||
+		strings.HasPrefix(lower, "muse-spark") ||
+		lower == "big-pickle" ||
+		lower == "space-bunny" ||
+		lower == "beam" ||
+		lower == "ll-alpha" {
+		return model, "opencode-free"
 	}
 
 	// Default to antigravity
