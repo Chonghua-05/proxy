@@ -94,6 +94,12 @@ export const translations = {
     'quotas.statusExhausted': 'Exhausted',
     'quotas.statusError': 'Check Failed',
     'quotas.statusUnsupported': 'Not Configured',
+    'quotas.modelsModalTitle': 'Covered Models',
+    'quotas.modelsModalDesc': '{count} models share this quota window. Use the exact model name when invoking.',
+    'quotas.modelsSearchPlaceholder': 'Search model name…',
+    'quotas.modelsEmpty': 'No matching models',
+    'quotas.viewModels': 'Covered models',
+    'quotas.clickToView': 'Click to view',
 
     // Keys Page
     'keys.title': 'API keys',
@@ -279,6 +285,12 @@ export const translations = {
     'quotas.statusExhausted': '额度耗尽',
     'quotas.statusError': '查询失败',
     'quotas.statusUnsupported': '未配置',
+    'quotas.modelsModalTitle': '涵盖模型',
+    'quotas.modelsModalDesc': '共 {count} 个模型共享该额度配额。调用时直接使用模型名称即可。',
+    'quotas.modelsSearchPlaceholder': '搜索模型名称…',
+    'quotas.modelsEmpty': '无匹配模型',
+    'quotas.viewModels': '涵盖模型',
+    'quotas.clickToView': '点击弹窗查看',
 
     // Keys Page
     'keys.title': 'API 密钥',

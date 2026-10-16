@@ -171,7 +171,10 @@ func TestQuotaManager_AntigravitySummaryDriver(t *testing.T) {
 	assert.Equal(t, "warning", res.Status)
 	assert.Equal(t, "test@example.com", res.Account)
 	require.Len(t, res.Buckets, 4)
-	assert.Equal(t, "gemini-weekly", res.Buckets[0].ModelID)
-	assert.Equal(t, "Gemini 周限额", res.Buckets[0].DisplayName)
-	assert.Contains(t, res.Buckets[0].Models, "Gemini Flash")
+	assert.Equal(t, "gemini-5h", res.Buckets[0].ModelID)
+	assert.Equal(t, "Gemini 5小时额度", res.Buckets[0].DisplayName)
+	assert.Equal(t, "gemini-weekly", res.Buckets[1].ModelID)
+	assert.Equal(t, "Gemini 周限额", res.Buckets[1].DisplayName)
+	assert.Contains(t, res.Buckets[0].Models, "gemini-3.8-flash-high")
+	assert.Contains(t, res.Buckets[2].Models, "claude-sonnet-4-6")
 }

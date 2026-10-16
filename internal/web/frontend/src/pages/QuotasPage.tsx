@@ -1,10 +1,30 @@
 import { useState, useEffect, useCallback } from 'react'
-import { RotateCwIcon, ServerIcon, CheckCircle2Icon, AlertTriangleIcon, XCircleIcon, HelpCircleIcon, ChevronDownIcon, ChevronUpIcon, LayersIcon } from 'lucide-react'
+import {
+  RotateCwIcon,
+  ServerIcon,
+  CheckCircle2Icon,
+  AlertTriangleIcon,
+  XCircleIcon,
+  HelpCircleIcon,
+  LayersIcon,
+  SearchIcon,
+  CopyIcon,
+  CheckIcon,
+} from 'lucide-react'
 
 import PageHeader from '@/components/PageHeader'
 import DismissibleAlert from '@/components/DismissibleAlert'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { useI18n } from '@/lib/i18n'
 import { listQuotas, getProviderQuota, type QuotaResult, type QuotaBucket } from '@/api/client'
@@ -51,8 +71,14 @@ function StatusBadge({ status }: { status: QuotaResult['status'] }) {
   }
 }
 
-function BucketProgressBar({ bucket }: { bucket: QuotaBucket }) {
-  const [expanded, setExpanded] = useState(false)
+function BucketProgressBar({
+  bucket,
+  onViewModels,
+}: {
+  bucket: QuotaBucket
+  onViewModels?: (bucket: QuotaBucket) => void
+}) {
+  const { t } = useI18n()
   const pct = bucket.remaining_percent ?? (bucket.remaining_fraction !== undefined ? bucket.remaining_fraction * 100 : null)
   let barColor = 'bg-primary'
   if (pct !== null) {
@@ -95,31 +121,120 @@ function BucketProgressBar({ bucket }: { bucket: QuotaBucket }) {
       </div>
 
       {hasModels && (
-        <div className="pt-1 border-t border-border/30 mt-0.5">
+        <div className="pt-2 border-t border-border/30 mt-0.5 flex items-center justify-between">
           <button
             type="button"
-            onClick={() => setExpanded(!expanded)}
-            className="flex items-center justify-between w-full text-[11px] font-mono text-muted-foreground hover:text-foreground transition-colors py-0.5"
+            onClick={() => onViewModels?.(bucket)}
+            className="flex items-center gap-1.5 text-xs font-mono text-foreground/80 hover:text-foreground hover:underline transition-colors py-0.5 group"
           >
-            <span className="flex items-center gap-1">
-              <LayersIcon className="size-3 text-brass" />
-              <span>涵盖模型 ({bucket.models?.length})</span>
-            </span>
-            {expanded ? <ChevronUpIcon className="size-3" /> : <ChevronDownIcon className="size-3" />}
+            <LayersIcon className="size-3.5 text-brass group-hover:scale-110 transition-transform" />
+            <span>{t('quotas.viewModels')} ({bucket.models?.length})</span>
           </button>
-
-          {expanded && (
-            <div className="flex flex-wrap gap-1.5 pt-2">
-              {bucket.models?.map((m) => (
-                <Badge key={m} variant="outline" className="text-[10px] bg-background/60 font-mono font-normal">
-                  {m}
-                </Badge>
-              ))}
-            </div>
-          )}
+          <span className="text-[10px] font-mono text-muted-foreground/60">{t('quotas.clickToView')}</span>
         </div>
       )}
     </div>
+  )
+}
+
+function ModelsDialog({
+  bucket,
+  open,
+  onOpenChange,
+}: {
+  bucket: QuotaBucket | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const { t } = useI18n()
+  const [filter, setFilter] = useState('')
+  const [copiedModel, setCopiedModel] = useState<string | null>(null)
+
+  if (!bucket) return null
+
+  const models = bucket.models || []
+  const filtered = models.filter((m) =>
+    m.toLowerCase().includes(filter.toLowerCase()),
+  )
+
+  const handleCopy = (m: string) => {
+    navigator.clipboard.writeText(m)
+    setCopiedModel(m)
+    setTimeout(() => setCopiedModel(null), 1800)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            <LayersIcon className="size-4 text-brass" />
+            <DialogTitle className="font-mono text-base">
+              {bucket.display_name || bucket.model_id} {t('quotas.modelsModalTitle')}
+            </DialogTitle>
+          </div>
+          <DialogDescription className="text-xs font-mono text-muted-foreground">
+            {t('quotas.modelsModalDesc', { count: models.length })}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 pt-2">
+          {models.length > 5 && (
+            <div className="relative">
+              <SearchIcon className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder={t('quotas.modelsSearchPlaceholder')}
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="pl-8 h-8 text-xs font-mono"
+              />
+            </div>
+          )}
+
+          <div className="max-h-[50vh] overflow-y-auto space-y-1.5 pr-1">
+            {filtered.length === 0 ? (
+              <div className="text-xs font-mono text-muted-foreground py-8 text-center">
+                {t('quotas.modelsEmpty')}
+              </div>
+            ) : (
+              filtered.map((m) => (
+                <div
+                  key={m}
+                  className="flex items-center justify-between p-2 rounded-md border border-border/40 bg-card/60 hover:bg-card text-xs font-mono transition-colors"
+                >
+                  <span className="font-medium text-foreground select-all">{m}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(m)}
+                    className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted"
+                    title={t('common.copy')}
+                  >
+                    {copiedModel === m ? (
+                      <>
+                        <CheckIcon className="size-3 text-emerald-500" />
+                        <span className="text-emerald-500">{t('common.copied')}</span>
+                      </>
+                    ) : (
+                      <>
+                        <CopyIcon className="size-3" />
+                        <span>{t('common.copy')}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            {t('common.cancel')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -130,6 +245,7 @@ export default function QuotasPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [refreshingId, setRefreshingId] = useState<string | null>(null)
+  const [selectedBucketForModels, setSelectedBucketForModels] = useState<QuotaBucket | null>(null)
 
   const fetchAll = useCallback(async (isManual = false) => {
     if (isManual) setRefreshing(true)
@@ -256,7 +372,11 @@ export default function QuotasPage() {
                       </div>
                       <div className="grid gap-2.5 sm:grid-cols-2">
                         {q.buckets.map((b) => (
-                          <BucketProgressBar key={b.model_id} bucket={b} />
+                          <BucketProgressBar
+                            key={b.model_id}
+                            bucket={b}
+                            onViewModels={(bucket) => setSelectedBucketForModels(bucket)}
+                          />
                         ))}
                       </div>
                     </div>
@@ -278,6 +398,14 @@ export default function QuotasPage() {
           ))}
         </div>
       )}
+
+      <ModelsDialog
+        bucket={selectedBucketForModels}
+        open={!!selectedBucketForModels}
+        onOpenChange={(open) => {
+          if (!open) setSelectedBucketForModels(null)
+        }}
+      />
     </div>
   )
 }

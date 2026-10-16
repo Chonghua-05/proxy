@@ -63,6 +63,41 @@ type userQuotaResponse struct {
 	} `json:"buckets"`
 }
 
+var (
+	geminiGroupModels = []string{
+		"gemini-3.8-flash-high",
+		"gemini-3.8-flash-medium",
+		"gemini-3.8-flash-low",
+		"gemini-3.8-flash-tiered",
+		"gemini-3.7-flash-high",
+		"gemini-3.7-flash-medium",
+		"gemini-3.7-flash-low",
+		"gemini-3.6-flash-high",
+		"gemini-3.6-flash-medium",
+		"gemini-3.6-flash-low",
+		"gemini-3.5-flash-lite",
+		"gemini-3.5-flash-low",
+		"gemini-3.5-flash-extra-low",
+		"gemini-3.1-pro-high",
+		"gemini-3.1-pro-low",
+		"gemini-3.1-flash-lite",
+		"gemini-3.1-flash-image",
+		"gemini-3-flash",
+		"gemini-3-flash-agent",
+		"gemini-2.5-pro",
+		"gemini-2.5-flash",
+		"gemini-2.5-flash-lite",
+		"gemini-2.5-flash-thinking",
+		"gemini-pro-agent",
+	}
+
+	claudeGPTGroupModels = []string{
+		"claude-opus-4-6-thinking",
+		"claude-sonnet-4-6",
+		"gpt-oss-120b-medium",
+	}
+)
+
 func (d *AntigravityDriver) Fetch(ctx context.Context, p *models.Provider) (*Result, error) {
 	var cfg antigravityConfig
 	if p.QuotaConfig != "" {
@@ -143,30 +178,23 @@ func (d *AntigravityDriver) Fetch(ctx context.Context, p *models.Provider) (*Res
 		for _, g := range summaryData.Groups {
 			isGemini := strings.Contains(strings.ToLower(g.DisplayName), "gemini")
 			groupLabel := "Claude/GPT"
-			defaultModels := []string{"Claude Sonnet 3.7 / 3.5", "Claude Opus 3.7 / 3.5", "GPT-OSS 120B"}
+			modelsList := claudeGPTGroupModels
 			if isGemini {
 				groupLabel = "Gemini"
-				defaultModels = []string{"Gemini 3.8 Flash / Pro", "Gemini 3.7 Flash", "Gemini 3.6 / 3.1", "Gemini Pro Agent"}
+				modelsList = geminiGroupModels
 			}
 
-			// Parse models description if available (e.g. "Models within this group: ...")
-			modelsList := defaultModels
-			if strings.Contains(g.Description, ":") {
-				parts := strings.Split(g.Description, ":")
-				if len(parts) > 1 {
-					items := strings.Split(parts[1], ",")
-					var parsed []string
-					for _, it := range items {
-						trimmed := strings.TrimSpace(it)
-						if trimmed != "" {
-							parsed = append(parsed, trimmed)
-						}
-					}
-					if len(parsed) > 0 {
-						modelsList = parsed
-					}
+			// Sort buckets inside each group so 5h is first (left), weekly is second (right)
+			sort.SliceStable(g.Buckets, func(i, j int) bool {
+				b1 := g.Buckets[i]
+				b2 := g.Buckets[j]
+				is5h1 := b1.Window == "5h" || strings.Contains(b1.BucketID, "5h")
+				is5h2 := b2.Window == "5h" || strings.Contains(b2.BucketID, "5h")
+				if is5h1 && !is5h2 {
+					return true
 				}
-			}
+				return false
+			})
 
 			for _, b := range g.Buckets {
 				var pct *float64

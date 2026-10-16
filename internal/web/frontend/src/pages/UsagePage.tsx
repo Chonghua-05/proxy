@@ -16,6 +16,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatCompact, formatDateTime } from '@/lib/format'
 import { useI18n } from '@/lib/i18n'
+import { cn } from '@/lib/utils'
 import {
   queryUsage,
   getUsageSummary,
@@ -59,6 +60,7 @@ export default function UsagePage() {
   const [page, setPage] = useState(1)
   const [rankingTab, setRankingTab] = useState<'keys' | 'models'>('keys')
   const [chartRange, setChartRange] = useState<'7d' | '14d' | '30d' | 'all'>('7d')
+  const [activeIdx, setActiveIdx] = useState<number | null>(null)
   const perPage = 50
 
   const [refreshTick, setRefreshTick] = useState(0)
@@ -287,8 +289,8 @@ export default function UsagePage() {
               {t('usage.noChartData')}
             </div>
           ) : (
-            <div className="flex flex-1 flex-col justify-between pt-1 min-w-0 overflow-hidden">
-              <div className="relative flex-1 flex items-end min-w-0 overflow-hidden">
+            <div className="flex flex-1 flex-col justify-between pt-2 min-w-0">
+              <div className="relative flex-1 flex items-end min-w-0">
                 {/* 背景水平参考线 */}
                 <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-30">
                   <div className="border-b border-dashed border-border w-full" />
@@ -296,22 +298,39 @@ export default function UsagePage() {
                   <div className="border-b border-border w-full" />
                 </div>
 
-                {/* 柱状图：自适应 flex 均分并防止任何超出 */}
-                <div className="relative z-10 flex w-full h-full items-end gap-1 px-1 min-w-0 overflow-hidden">
+                {/* 柱状图：自适应 flex 均分 */}
+                <div className="relative z-10 flex w-full h-full items-end gap-1 px-1 min-w-0">
                   {timeline.map((tp, idx) => {
                     const heightPct = Math.max(8, Math.round((tp.total_tokens / maxTokens) * 100))
+                    const isActive = activeIdx === idx
+                    const alignClass = idx < 2 ? 'left-0' : idx > timeline.length - 3 ? 'right-0' : 'left-1/2 -translate-x-1/2'
                     return (
                       <div
                         key={idx}
-                        className="group relative flex flex-1 min-w-0 flex-col items-center justify-end h-full"
+                        onClick={() => setActiveIdx(activeIdx === idx ? null : idx)}
+                        onMouseEnter={() => setActiveIdx(idx)}
+                        onMouseLeave={() => setActiveIdx((cur) => (cur === idx ? null : cur))}
+                        className="group relative flex flex-1 min-w-0 flex-col items-center justify-end h-full cursor-pointer hover:bg-muted/30 rounded-t-xs transition-colors"
                       >
-                        <div className="absolute -top-12 z-20 hidden whitespace-nowrap rounded-md bg-popover px-2.5 py-1.5 font-mono text-[11px] shadow-lg border text-popover-foreground group-hover:flex flex-col items-center pointer-events-none">
-                          <span className="text-muted-foreground">{tp.timestamp}</span>
-                          <span className="font-medium text-foreground">{tp.total_tokens.toLocaleString()} tokens ({tp.requests} reqs)</span>
-                        </div>
+                        {isActive && (
+                          <div
+                            className={cn(
+                              'absolute -top-12 z-30 whitespace-nowrap rounded-md bg-popover px-2.5 py-1.5 font-mono text-[11px] shadow-lg border text-popover-foreground flex flex-col items-center pointer-events-none animate-in fade-in-0 zoom-in-95',
+                              alignClass
+                            )}
+                          >
+                            <span className="text-muted-foreground">{tp.timestamp}</span>
+                            <span className="font-medium text-foreground">
+                              {tp.total_tokens.toLocaleString()} tokens ({tp.requests} reqs)
+                            </span>
+                          </div>
+                        )}
                         <div
                           style={{ height: `${heightPct}%` }}
-                          className="w-full bg-brass/80 hover:bg-brass transition-all rounded-t-xs"
+                          className={cn(
+                            'w-full transition-all rounded-t-xs',
+                            isActive ? 'bg-brass shadow-xs' : 'bg-brass/80 group-hover:bg-brass'
+                          )}
                         />
                       </div>
                     )
