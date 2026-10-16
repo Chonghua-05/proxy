@@ -65,31 +65,16 @@ type userQuotaResponse struct {
 }
 
 var (
+	// Only the models actually served through cli-proxy-api are listed. Older
+	// ids (3.7/3.6 flash, 3.1-pro, 2.5-*, pro-agent, effort aliases) were
+	// retired upstream and now answer "unknown provider for model", so they are
+	// deliberately omitted to keep the quota dialog aligned with reality.
 	geminiGroupModels = []string{
 		"gemini-3.8-flash-high",
-		"gemini-3.8-flash-medium",
-		"gemini-3.8-flash-low",
-		"gemini-3.8-flash-tiered",
-		"gemini-3.7-flash-high",
-		"gemini-3.7-flash-medium",
-		"gemini-3.7-flash-low",
-		"gemini-3.6-flash-high",
-		"gemini-3.6-flash-medium",
-		"gemini-3.6-flash-low",
+		"gemini-3-flash",
 		"gemini-3.5-flash-lite",
-		"gemini-3.5-flash-low",
-		"gemini-3.5-flash-extra-low",
-		"gemini-3.1-pro-high",
-		"gemini-3.1-pro-low",
 		"gemini-3.1-flash-lite",
 		"gemini-3.1-flash-image",
-		"gemini-3-flash",
-		"gemini-3-flash-agent",
-		"gemini-2.5-pro",
-		"gemini-2.5-flash",
-		"gemini-2.5-flash-lite",
-		"gemini-2.5-flash-thinking",
-		"gemini-pro-agent",
 	}
 
 	claudeGPTGroupModels = []string{
