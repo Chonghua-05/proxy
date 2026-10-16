@@ -252,13 +252,25 @@ func (d *AntigravityDriver) Fetch(ctx context.Context, p *models.Provider) (*Res
 
 	// If retrieveUserQuotaSummary succeeded, construct clean categorized buckets
 	if sErr == nil && summaryData != nil && len(summaryData.Groups) > 0 {
+		// Pull the live model list from the provider's OpenAI-compatible
+		// /v1/models endpoint (served by the local cli-proxy-api, which derives
+		// it from Antigravity's fetchAvailableModels) so the coverage shown next
+		// to each bucket tracks what the upstream actually serves. Falls back to
+		// the static lists when the endpoint is unreachable.
+		liveGemini, liveClaudeGPT := groupModelIDs(fetchAvailableModelIDs(ctx, p.BaseURL, p.APIKey))
 		for _, g := range summaryData.Groups {
 			isGemini := strings.Contains(strings.ToLower(g.DisplayName), "gemini")
 			groupLabel := "Claude/GPT"
 			modelsList := claudeGPTGroupModels
+			if len(liveClaudeGPT) > 0 {
+				modelsList = liveClaudeGPT
+			}
 			if isGemini {
 				groupLabel = "Gemini"
 				modelsList = geminiGroupModels
+				if len(liveGemini) > 0 {
+					modelsList = liveGemini
+				}
 			}
 
 			// Sort buckets inside each group so 5h is first (left), weekly is second (right)
@@ -455,6 +467,66 @@ func queryUserQuota(ctx context.Context, client *http.Client, baseURL, token, pr
 		return nil, err
 	}
 	return &data, nil
+}
+
+// fetchAvailableModelIDs queries the provider's OpenAI-compatible /v1/models
+// endpoint and returns the live model IDs. For the antigravity provider that
+// endpoint is served by the local cli-proxy-api, which derives the list from
+// Antigravity's fetchAvailableModels — so it reflects exactly what the upstream
+// currently serves instead of a hand-maintained list that rots whenever Google
+// retires a model. Returns nil on any failure so callers fall back to the
+// static coverage lists.
+func fetchAvailableModelIDs(ctx context.Context, baseURL, apiKey string) []string {
+	if baseURL == "" {
+		return nil
+	}
+	endpoint := strings.TrimRight(baseURL, "/") + "/v1/models"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil
+	}
+	if apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil
+	}
+	var data struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil
+	}
+	ids := make([]string, 0, len(data.Data))
+	for _, m := range data.Data {
+		if m.ID != "" {
+			ids = append(ids, m.ID)
+		}
+	}
+	return ids
+}
+
+// groupModelIDs splits live model IDs into the Gemini and Claude/GPT coverage
+// lists shown next to each quota bucket, preserving the upstream ordering.
+func groupModelIDs(ids []string) (gemini, claudeGPT []string) {
+	for _, id := range ids {
+		l := strings.ToLower(id)
+		switch {
+		case strings.Contains(l, "gemini"):
+			gemini = append(gemini, id)
+		case strings.Contains(l, "claude") || strings.Contains(l, "gpt"):
+			claudeGPT = append(claudeGPT, id)
+		}
+	}
+	return gemini, claudeGPT
 }
 
 func refreshGoogleToken(ctx context.Context, client *http.Client, clientID, clientSecret, refreshToken string) (string, error) {
