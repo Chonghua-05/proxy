@@ -513,6 +513,18 @@ func (f *Forwarder) ForwardListModels(
 	return err
 }
 
+// providerModelPrefix returns the namespace a provider's model ids are
+// advertised under. Prefixing at the listing layer makes the advertised list
+// self-routing: whatever the client picks already matches routeModel's explicit
+// prefix rule, so a model can never be advertised and then sent to the wrong
+// upstream just because its name did not match a hardcoded heuristic.
+func providerModelPrefix(providerName string) string {
+	if providerName == "gemini-web" {
+		return "web/"
+	}
+	return ""
+}
+
 // FetchAndMergeModels fetches models from all provided providers concurrently and deduplicates them.
 func (f *Forwarder) FetchAndMergeModels(ctx context.Context, providers []models.Provider) map[string]any {
 	type modelResponse struct {
@@ -560,17 +572,41 @@ func (f *Forwarder) FetchAndMergeModels(ctx context.Context, providers []models.
 				return
 			}
 
-			mu.Lock()
+			prefix := providerModelPrefix(prov.Name)
+			batch := make([]json.RawMessage, 0, len(mr.Data))
+			ids := make([]string, 0, len(mr.Data))
+
 			for _, item := range mr.Data {
-				var idObj struct {
-					ID string `json:"id"`
+				var obj map[string]any
+				if err := json.Unmarshal(item, &obj); err != nil {
+					continue
 				}
-				if err := json.Unmarshal(item, &idObj); err == nil && idObj.ID != "" {
-					if !seen[idObj.ID] {
-						seen[idObj.ID] = true
-						merged = append(merged, item)
+				id, _ := obj["id"].(string)
+				if id == "" {
+					continue
+				}
+				if prefix != "" {
+					id = prefix + id
+					obj["id"] = id
+					if _, ok := obj["name"]; ok {
+						obj["name"] = id
 					}
 				}
+				rewritten, err := json.Marshal(obj)
+				if err != nil {
+					continue
+				}
+				batch = append(batch, rewritten)
+				ids = append(ids, id)
+			}
+
+			mu.Lock()
+			for i, id := range ids {
+				if seen[id] {
+					continue
+				}
+				seen[id] = true
+				merged = append(merged, batch[i])
 			}
 			mu.Unlock()
 		}(p)
