@@ -6,17 +6,15 @@ import { cn } from '@/lib/utils'
  * name always lowercase Regular 400.
  */
 export default function Lockup({
-  project = 'proxy',
+  project = 'llm-proxy',
   className,
 }: {
   project?: string
   className?: string
 }) {
   return (
-    <span className={cn('font-mono lowercase leading-none', className)}>
-      <span className="tracking-logotype font-medium">lab34</span>
-      <span className="text-brass">/</span>
-      <span className="font-normal">{project}</span>
+    <span className={cn('font-mono lowercase leading-none font-medium tracking-logotype', className)}>
+      {project}
     </span>
   )
 }

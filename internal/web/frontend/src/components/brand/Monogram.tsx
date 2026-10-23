@@ -23,7 +23,7 @@ export default function Monogram({ size = 48, variant = 'outline', className }: 
       width={size}
       height={size}
       role="img"
-      aria-label="lab34 monogram"
+      aria-label="llm-proxy monogram"
       className={cn('shrink-0', className)}
     >
       {variant === 'filled' ? (

@@ -235,7 +235,7 @@ export default function Layout() {
         </div>
 
         <div className="flex shrink-0 items-center gap-2 border-t px-4 py-3 font-mono text-xs text-muted-foreground bg-card/20">
-          <span className="flex-1 truncate">lab34 — llm-proxy</span>
+          <span className="flex-1 truncate">llm-proxy</span>
           <Monogram size={20} variant="outline" />
         </div>
       </aside>
