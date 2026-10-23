@@ -79,6 +79,7 @@ func main() {
 	admin.GET("/keys", adminH.ListAPIKeys)
 	admin.PUT("/keys/:id", adminH.UpdateAPIKey)
 	admin.DELETE("/keys/:id", adminH.RevokeAPIKey)
+	admin.DELETE("/keys/:id/purge", adminH.PurgeAPIKey)
 
 	admin.GET("/usage", adminH.QueryUsage)
 	admin.GET("/usage/summary", adminH.GetUsageSummary)

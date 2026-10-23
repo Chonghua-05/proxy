@@ -26,7 +26,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDateTime } from '@/lib/format'
 import { useI18n } from '@/lib/i18n'
-import { listKeys, createKey, updateKey, revokeKey, listProviders, getSystemInfo, type APIKey, type Provider } from '@/api/client'
+import { listKeys, createKey, updateKey, revokeKey, purgeKey, listProviders, getSystemInfo, type APIKey, type Provider } from '@/api/client'
 
 export default function KeysPage() {
   const { t } = useI18n()
@@ -41,6 +41,7 @@ export default function KeysPage() {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingKey, setEditingKey] = useState<APIKey | null>(null)
   const [revokeTarget, setRevokeTarget] = useState<APIKey | null>(null)
+  const [purgeTarget, setPurgeTarget] = useState<APIKey | null>(null)
 
   // Form states for create
   const [name, setName] = useState('')
@@ -170,6 +171,16 @@ export default function KeysPage() {
       reload()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to revoke key')
+    }
+  }
+
+  async function handlePurge(id: string) {
+    try {
+      await purgeKey(id)
+      setFlash(t('keys.purgedSuccess'))
+      reload()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to delete key')
     }
   }
 
@@ -318,7 +329,18 @@ export default function KeysPage() {
                   <TableCell className="text-right font-mono text-xs tabular-nums">{k.rate_limit_rpm}</TableCell>
                   <TableCell className="whitespace-nowrap">
                     {k.revoked_at ? (
-                      <Badge variant="muted">{t('keys.revoked')}</Badge>
+                      <div className="flex items-center gap-1">
+                        <Badge variant="muted">{t('keys.revoked')}</Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`${t('keys.purgeConfirmTitle')} ${k.name}`}
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() => setPurgeTarget(k)}
+                        >
+                          <Trash2Icon className="size-3.5" />
+                        </Button>
+                      </div>
                     ) : (
                       <Badge variant="outline">
                         <span className="size-1.5 bg-brass mr-1" aria-hidden />
@@ -527,6 +549,15 @@ export default function KeysPage() {
         description={t('keys.revokeConfirmDesc', { name: revokeTarget?.name || '' })}
         confirmLabel={t('common.revoke')}
         onConfirm={() => { if (revokeTarget) handleRevoke(revokeTarget.id) }}
+      />
+
+      <ConfirmDialog
+        open={purgeTarget !== null}
+        onOpenChange={(open) => { if (!open) setPurgeTarget(null) }}
+        title={t('keys.purgeConfirmTitle')}
+        description={t('keys.purgeConfirmDesc', { name: purgeTarget?.name || '' })}
+        confirmLabel={t('common.delete')}
+        onConfirm={() => { if (purgeTarget) handlePurge(purgeTarget.id) }}
       />
     </div>
   )

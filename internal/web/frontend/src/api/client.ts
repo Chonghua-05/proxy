@@ -148,6 +148,11 @@ export function revokeKey(id: string): Promise<void> {
   return request(`/keys/${id}`, { method: 'DELETE' })
 }
 
+/** Permanently removes an already-revoked key so it leaves the list entirely. */
+export function purgeKey(id: string): Promise<void> {
+  return request(`/keys/${id}/purge`, { method: 'DELETE' })
+}
+
 export function updateKey(id: string, data: { name?: string; provider_id?: string; allowed_providers?: string; rate_limit_rpm?: number }): Promise<APIKey> {
   return request(`/keys/${id}`, { method: 'PUT', body: JSON.stringify(data) })
 }

@@ -226,6 +226,31 @@ func (h *AdminHandler) RevokeAPIKey(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+// PurgeAPIKey hard-deletes an already-revoked key so it stops appearing in the
+// console at all. Revoking stays the reversible step; purging is deliberately
+// restricted to revoked keys so an active credential cannot be dropped by a
+// single misclick.
+func (h *AdminHandler) PurgeAPIKey(c echo.Context) error {
+	id := c.Param("id")
+	key, err := h.keys.GetByID(id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	if key == nil {
+		return echo.NewHTTPError(http.StatusNotFound, "api key not found")
+	}
+	if key.RevokedAt == nil {
+		return echo.NewHTTPError(http.StatusConflict, "revoke the key first")
+	}
+	if err := h.keys.Delete(id); err != nil {
+		if err == sql.ErrNoRows {
+			return echo.NewHTTPError(http.StatusNotFound, "api key not found")
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
 type updateAPIKeyReq struct {
 	Name             *string `json:"name"`
 	ProviderID       *string `json:"provider_id"`

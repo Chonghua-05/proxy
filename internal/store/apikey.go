@@ -104,6 +104,21 @@ func (s *APIKeyStore) Revoke(id string) error {
 	return nil
 }
 
+// Delete removes a key row permanently. Callers must revoke first: a revoked
+// key stays visible (greyed out) in the console, and purging is the explicit
+// second step that takes it off the list for good.
+func (s *APIKeyStore) Delete(id string) error {
+	res, err := s.db.Exec(`DELETE FROM api_keys WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 func (s *APIKeyStore) Update(id string, name *string, providerID *string, rateLimitRPM *int) (*models.APIKey, error) {
 	return s.UpdateWithAllowedProviders(id, name, providerID, nil, rateLimitRPM)
 }
