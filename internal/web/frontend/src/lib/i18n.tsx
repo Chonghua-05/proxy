@@ -36,6 +36,8 @@ export const translations = {
     'common.success': 'Success',
     'common.page': 'Page',
     'common.of': 'of',
+    'common.goToPage': 'Go to',
+    'common.pageUnit': 'page',
     'common.confirm': 'Confirm',
     'common.refresh': 'Refresh',
     'common.refreshing': 'Refreshing…',
@@ -153,6 +155,10 @@ export const translations = {
     'usage.recentLogs': 'Detailed Request Logs',
     'usage.requestsTrend': 'request points',
     'usage.noChartData': 'Not enough data points to plot.',
+    'usage.range24h': 'Past 24h',
+    'usage.range7d': 'Past 7d',
+    'usage.range30d': 'Past 30d',
+    'usage.rangeAll': 'All',
 
     // Guardrails Page
     'guardrails.title': 'Guardrails',
@@ -229,6 +235,8 @@ export const translations = {
     'common.success': '成功',
     'common.page': '第',
     'common.of': '页，共',
+    'common.goToPage': '跳至',
+    'common.pageUnit': '页',
     'common.confirm': '确认',
     'common.refresh': '刷新',
     'common.refreshing': '刷新中…',
@@ -347,6 +355,10 @@ export const translations = {
     'usage.recentLogs': '请求调用明细',
     'usage.requestsTrend': '个采样时段',
     'usage.noChartData': '暂无足够数据展示趋势图。',
+    'usage.range24h': '近24小时',
+    'usage.range7d': '近7天',
+    'usage.range30d': '近30天',
+    'usage.rangeAll': '全部',
 
     // Guardrails Page
     'guardrails.title': '安全护栏',

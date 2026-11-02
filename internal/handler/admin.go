@@ -288,8 +288,11 @@ func (h *AdminHandler) UpdateAPIKey(c echo.Context) error {
 
 func (h *AdminHandler) GetUsageSummary(c echo.Context) error {
 	q := store.UsageQuery{
-		APIKeyID:   c.QueryParam("api_key_id"),
-		ProviderID: c.QueryParam("provider_id"),
+		APIKeyID:      c.QueryParam("api_key_id"),
+		ProviderID:    c.QueryParam("provider_id"),
+		TimelineRange: c.QueryParam("range"),
+		Interval:      c.QueryParam("interval"),
+		TzOffset:      intParam(c, "tz_offset", 0),
 	}
 
 	if s := c.QueryParam("start"); s != "" {

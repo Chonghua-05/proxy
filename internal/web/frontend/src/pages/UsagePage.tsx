@@ -59,7 +59,8 @@ export default function UsagePage() {
   const [filterEnd, setFilterEnd] = useState('')
   const [page, setPage] = useState(1)
   const [rankingTab, setRankingTab] = useState<'keys' | 'models'>('keys')
-  const [chartRange, setChartRange] = useState<'7d' | '14d' | '30d' | 'all'>('7d')
+  const [chartRange, setChartRange] = useState<'24h' | '7d' | '30d' | 'all'>('24h')
+  const [jumpPage, setJumpPage] = useState('')
   const [activeIdx, setActiveIdx] = useState<number | null>(null)
   const perPage = 50
 
@@ -82,7 +83,10 @@ export default function UsagePage() {
         if (filterStart) params.start = new Date(filterStart).toISOString()
         if (filterEnd) params.end = new Date(filterEnd).toISOString()
 
-        const summaryParams: Record<string, string> = {}
+        const summaryParams: Record<string, string> = {
+          range: chartRange,
+          tz_offset: String(-new Date().getTimezoneOffset()),
+        }
         if (filterKeyId !== ALL) summaryParams.api_key_id = filterKeyId
         if (filterProviderId !== ALL) summaryParams.provider_id = filterProviderId
         if (filterStart) summaryParams.start = new Date(filterStart).toISOString()
@@ -110,7 +114,7 @@ export default function UsagePage() {
       }
     })()
     return () => { stale = true }
-  }, [page, filterKeyId, filterProviderId, filterStart, filterEnd, refreshTick])
+  }, [page, filterKeyId, filterProviderId, filterStart, filterEnd, chartRange, refreshTick])
 
   const totalPages = Math.max(1, Math.ceil(total / perPage))
 
@@ -130,28 +134,16 @@ export default function UsagePage() {
     setPage(1)
   }
 
-  const rawTimeline = summary?.timeline || []
-  
-  // 根据 chartRange 过滤最近 N 天，隐藏更早数据，防止图表撑爆溢出
-  const timeline = (() => {
-    if (chartRange === 'all' || rawTimeline.length === 0) return rawTimeline
-    const days = chartRange === '7d' ? 7 : chartRange === '14d' ? 14 : 30
-    const now = new Date()
-    const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
-    
-    const filtered = rawTimeline.filter((tp) => {
-      // timestamp 格式可能是 "2026-10-15 11:00" 或 ISO
-      const t = new Date(tp.timestamp.replace(' ', 'T'))
-      return isNaN(t.getTime()) || t >= cutoff
-    })
-    // 如果筛选后数据较少，至少保留最新 20 个点以防空白
-    if (filtered.length < 5 && rawTimeline.length >= 5) {
-      return rawTimeline.slice(-20)
-    }
-    return filtered
-  })()
-
+  const timeline = summary?.timeline || []
   const maxTokens = Math.max(1, ...timeline.map((tp) => tp.total_tokens))
+
+  function formatAxisLabel(ts: string | undefined): string {
+    if (!ts) return ''
+    if (chartRange === '24h') {
+      return ts.length > 11 ? ts.slice(5) : ts
+    }
+    return ts.length > 5 ? ts.slice(5) : ts
+  }
 
   const topModels = summary?.top_models || []
   const maxModelTokens = Math.max(1, ...topModels.map((m) => m.total_tokens))
@@ -263,7 +255,7 @@ export default function UsagePage() {
             <div className="flex items-center gap-2 shrink-0">
               {/* 快速范围切换按钮组 */}
               <div className="flex items-center gap-0.5 p-0.5 bg-muted/40 rounded-md text-[11px] font-mono">
-                {(['7d', '14d', '30d', 'all'] as const).map((r) => (
+                {(['24h', '7d', '30d', 'all'] as const).map((r) => (
                   <button
                     key={r}
                     type="button"
@@ -274,7 +266,13 @@ export default function UsagePage() {
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    {r === '7d' ? '近7天' : r === '14d' ? '近14天' : r === '30d' ? '近30天' : '全部'}
+                    {r === '24h'
+                      ? t('usage.range24h')
+                      : r === '7d'
+                        ? t('usage.range7d')
+                        : r === '30d'
+                          ? t('usage.range30d')
+                          : t('usage.rangeAll')}
                   </button>
                 ))}
               </div>
@@ -301,7 +299,7 @@ export default function UsagePage() {
                 {/* 柱状图：自适应 flex 均分 */}
                 <div className="relative z-10 flex w-full h-full items-end gap-1 px-1 min-w-0">
                   {timeline.map((tp, idx) => {
-                    const heightPct = Math.max(8, Math.round((tp.total_tokens / maxTokens) * 100))
+                    const heightPct = maxTokens > 0 ? (tp.total_tokens / maxTokens) * 100 : 0
                     const isActive = activeIdx === idx
                     const alignClass = idx < 2 ? 'left-0' : idx > timeline.length - 3 ? 'right-0' : 'left-1/2 -translate-x-1/2'
                     return (
@@ -329,6 +327,7 @@ export default function UsagePage() {
                           style={{ height: `${heightPct}%` }}
                           className={cn(
                             'w-full transition-all rounded-t-xs',
+                            tp.total_tokens > 0 ? 'min-h-[2px]' : 'min-h-0 opacity-20',
                             isActive ? 'bg-brass shadow-xs' : 'bg-brass/80 group-hover:bg-brass'
                           )}
                         />
@@ -340,10 +339,10 @@ export default function UsagePage() {
 
               {/* 平整的时间刻度：动态自适应坐标轴 */}
               <div className="mt-2 flex justify-between border-t pt-1.5 font-mono text-[10px] text-muted-foreground/80 shrink-0 select-none">
-                <span>{timeline[0]?.timestamp.slice(5)}</span>
-                {timeline.length > 6 && <span>{timeline[Math.floor(timeline.length / 3)]?.timestamp.slice(5)}</span>}
-                {timeline.length > 6 && <span>{timeline[Math.floor((timeline.length * 2) / 3)]?.timestamp.slice(5)}</span>}
-                <span>{timeline[timeline.length - 1]?.timestamp.slice(5)}</span>
+                <span>{formatAxisLabel(timeline[0]?.timestamp)}</span>
+                {timeline.length > 6 && <span>{formatAxisLabel(timeline[Math.floor(timeline.length / 3)]?.timestamp)}</span>}
+                {timeline.length > 6 && <span>{formatAxisLabel(timeline[Math.floor((timeline.length * 2) / 3)]?.timestamp)}</span>}
+                <span>{formatAxisLabel(timeline[timeline.length - 1]?.timestamp)}</span>
               </div>
             </div>
           )}
@@ -482,10 +481,49 @@ export default function UsagePage() {
         </div>
 
         {totalPages > 1 && (
-          <div className="pt-2 flex items-center justify-between">
-            <span className="font-mono text-xs text-muted-foreground">
-              {t('common.page')} {page} / {totalPages}
-            </span>
+          <div className="pt-2 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-xs text-muted-foreground">
+                {t('common.page')} {page} / {totalPages}
+              </span>
+              <div className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
+                <span>{t('common.goToPage')}</span>
+                <Input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  placeholder={String(page)}
+                  value={jumpPage}
+                  onChange={(e) => setJumpPage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const p = parseInt(jumpPage, 10)
+                      if (!isNaN(p)) {
+                        setPage(Math.max(1, Math.min(totalPages, p)))
+                        setJumpPage('')
+                      }
+                    }
+                  }}
+                  className="h-7 w-16 px-1.5 py-0 text-center font-mono text-xs bg-card/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <span>{t('common.pageUnit')}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const p = parseInt(jumpPage, 10)
+                    if (!isNaN(p)) {
+                      setPage(Math.max(1, Math.min(totalPages, p)))
+                      setJumpPage('')
+                    }
+                  }}
+                  className="h-7 px-2 text-xs"
+                >
+                  {t('common.confirm')}
+                </Button>
+              </div>
+            </div>
+
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
                 <ChevronLeftIcon className="size-4" />

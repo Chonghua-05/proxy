@@ -28,12 +28,15 @@ func (s *UsageStore) Record(apiKeyID, providerID, model string, promptTokens, co
 }
 
 type UsageQuery struct {
-	APIKeyID   string
-	ProviderID string
-	Start      *time.Time
-	End        *time.Time
-	Limit      int
-	Offset     int
+	APIKeyID      string
+	ProviderID    string
+	Start         *time.Time
+	End           *time.Time
+	Limit         int
+	Offset        int
+	TimelineRange string // "24h", "7d", "30d", "all"
+	Interval      string // "hour", "day"
+	TzOffset      int    // minutes offset from UTC (e.g. +480 for UTC+8)
 }
 
 type UsageResult struct {
@@ -176,10 +179,60 @@ func (s *UsageStore) GetSummary(q UsageQuery) (*UsageSummary, error) {
 		return nil, fmt.Errorf("summary overall: %w", err)
 	}
 
-	// 2. Timeline (by hour if <= 3 days, by day otherwise; SQLite strftime)
-	timeQ := `SELECT COALESCE(strftime('%Y-%m-%d %H:00', created_at), substr(created_at, 1, 13) || ':00') as t, COUNT(*), COALESCE(SUM(prompt_tokens),0), COALESCE(SUM(completion_tokens),0), COALESCE(SUM(total_tokens),0)
-		FROM usage ` + whereClause + ` GROUP BY t ORDER BY t ASC LIMIT 100`
-	tRows, err := s.db.Query(timeQ, args...)
+	// 2. Timeline
+	isHour := false
+	if q.Interval == "hour" || q.TimelineRange == "24h" {
+		isHour = true
+	} else if q.Interval == "day" {
+		isHour = false
+	} else if q.Start != nil && q.End != nil && q.End.Sub(*q.Start) <= 72*time.Hour {
+		isHour = true
+	} else if q.Start != nil && q.End == nil && time.Since(*q.Start) <= 72*time.Hour {
+		isHour = true
+	}
+
+	format := "%Y-%m-%d"
+	fallbackSubstr := "substr(created_at, 1, 10)"
+	if isHour {
+		format = "%Y-%m-%d %H:00"
+		fallbackSubstr = "substr(created_at, 1, 13) || ':00'"
+	}
+
+	modifier := fmt.Sprintf("%+d minutes", q.TzOffset)
+
+	var timelineWhere []string
+	var timelineArgs []interface{}
+	timelineWhere = append(timelineWhere, where...)
+	timelineArgs = append(timelineArgs, args...)
+
+	if q.Start == nil && q.End == nil {
+		switch q.TimelineRange {
+		case "24h":
+			timelineWhere = append(timelineWhere, "created_at >= datetime('now', '-24 hours')")
+		case "7d":
+			timelineWhere = append(timelineWhere, "created_at >= datetime('now', '-7 days')")
+		case "30d":
+			timelineWhere = append(timelineWhere, "created_at >= datetime('now', '-30 days')")
+		case "all":
+			// no bounds
+		default:
+			if q.TimelineRange == "" {
+				timelineWhere = append(timelineWhere, "created_at >= datetime('now', '-7 days')")
+			}
+		}
+	}
+
+	timelineWhereClause := ""
+	if len(timelineWhere) > 0 {
+		timelineWhereClause = " WHERE " + strings.Join(timelineWhere, " AND ")
+	}
+
+	timeQ := fmt.Sprintf(`SELECT COALESCE(strftime('%s', datetime(substr(created_at, 1, 19), ?)), %s) as t,
+		COUNT(*), COALESCE(SUM(prompt_tokens),0), COALESCE(SUM(completion_tokens),0), COALESCE(SUM(total_tokens),0)
+		FROM usage%s GROUP BY t ORDER BY t ASC`, format, fallbackSubstr, timelineWhereClause)
+
+	queryArgs := append([]interface{}{modifier}, timelineArgs...)
+	tRows, err := s.db.Query(timeQ, queryArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("summary timeline: %w", err)
 	}
