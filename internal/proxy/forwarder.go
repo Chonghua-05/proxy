@@ -534,23 +534,6 @@ func normalizeAntigravityListID(id string) string {
 	return id
 }
 
-func isAllowedOpenCodeModel(id string) bool {
-	lower := strings.ToLower(id)
-	allowedPrefixes := []string{
-		"deepseek",
-		"mimo",
-		"glm-",
-		"qwen",
-		"kimi",
-	}
-	for _, p := range allowedPrefixes {
-		if strings.HasPrefix(lower, p) {
-			return true
-		}
-	}
-	return false
-}
-
 // FetchAndMergeModels fetches models from all provided providers concurrently and deduplicates them.
 func (f *Forwarder) FetchAndMergeModels(ctx context.Context, providers []models.Provider) map[string]any {
 	type modelResponse struct {
@@ -600,7 +583,6 @@ func (f *Forwarder) FetchAndMergeModels(ctx context.Context, providers []models.
 
 			prefix := providerModelPrefix(prov.Name)
 			isAntigravity := prov.QuotaType == "antigravity" || strings.Contains(strings.ToLower(prov.Name), "antigravity")
-			isOpenCode := strings.Contains(strings.ToLower(prov.Name), "opencode")
 
 			batch := make([]json.RawMessage, 0, len(mr.Data))
 			ids := make([]string, 0, len(mr.Data))
@@ -612,11 +594,6 @@ func (f *Forwarder) FetchAndMergeModels(ctx context.Context, providers []models.
 				}
 				id, _ := obj["id"].(string)
 				if id == "" {
-					continue
-				}
-
-				// If OpenCode provider, filter noise models
-				if isOpenCode && !isAllowedOpenCodeModel(id) {
 					continue
 				}
 

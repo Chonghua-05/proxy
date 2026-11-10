@@ -98,32 +98,36 @@ func (d *ModelsDriver) Fetch(ctx context.Context, p *models.Provider) (*Result, 
 
 	hundred := 100.0
 	one := 1.0
-	buckets := make([]Bucket, 0, len(res.Data))
+	allModelIDs := make([]string, 0, len(res.Data))
 	for _, m := range res.Data {
-		if m.ID == "" {
-			continue
+		if m.ID != "" {
+			allModelIDs = append(allModelIDs, m.ID)
 		}
-		desc := m.Description
-		if desc == "" {
-			desc = "在线可用"
-		}
-		buckets = append(buckets, Bucket{
-			ModelID:            m.ID,
+	}
+
+	buckets := []Bucket{
+		{
+			ModelID:            "shared-models",
+			DisplayName:        "共享模型限额",
+			GroupName:          "免费共享额度",
+			Models:             allModelIDs,
 			RemainingPercent:   &hundred,
 			RemainingFraction:  &one,
-			ResetTimeFormatted: desc,
-		})
+			ResetTimeFormatted: fmt.Sprintf("支持 %d 个模型共享额度", len(allModelIDs)),
+		},
 	}
 
 	accountStr := "在线会话 (Active)"
 	if strings.Contains(p.Name, "gemini") || strings.Contains(p.BaseURL, "8081") {
 		accountStr = "Gemini Web 会话"
+	} else if strings.Contains(p.Name, "opencode") {
+		accountStr = "OpenCode 免费号源"
 	}
 
 	return &Result{
 		Status:  "ok",
 		Account: accountStr,
 		Buckets: buckets,
-		Message: fmt.Sprintf("已成功获取 %d 个可用模型", len(buckets)),
+		Message: fmt.Sprintf("已成功获取 %d 个可用模型", len(allModelIDs)),
 	}, nil
 }
