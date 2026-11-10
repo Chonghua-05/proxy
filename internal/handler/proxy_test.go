@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -152,12 +153,10 @@ func TestRouteModel(t *testing.T) {
 		wantClean   string
 		wantTarget  string
 	}{
-		{"gemini-4-argon", "gemini-4-argon", "gemini-web"},
-		{"gemini-4", "gemini-4", "gemini-web"},
-		{"argon", "argon", "gemini-web"},
-		{"gemini-3.1-pro", "gemini-3.1-pro", "gemini-web"},
-		{"web/gemini-4-argon", "gemini-4-argon", "gemini-web"},
-		{"web/custom-model", "custom-model", "gemini-web"},
+		{"gemini-4-argon", "gemini-4-argon", ""},
+		{"gemini4argon", "gemini-4-argon", ""},
+		{"argon", "gemini-4-argon", ""},
+		{"gemini-4-argon-high", "gemini-4-argon-high", ""},
 		{"opencode/deepseek-v4.1", "deepseek-v4.1", "opencode-free"},
 		{"free/mimo-v2.6-flash", "mimo-v2.6-flash", "opencode-free"},
 		{"deepseek-v4.1-flash-free", "deepseek-v4.1-flash-free", "opencode-free"},
@@ -173,5 +172,68 @@ func TestRouteModel(t *testing.T) {
 		clean, target := routeModel(tt.input)
 		assert.Equal(t, tt.wantClean, clean, "input: %s", tt.input)
 		assert.Equal(t, tt.wantTarget, target, "input: %s", tt.input)
+	}
+}
+
+func TestResolveUpstreamModel(t *testing.T) {
+	agProvider := &models.Provider{
+		Name:      "antigravity-local",
+		QuotaType: "antigravity",
+	}
+
+	tests := []struct {
+		model    string
+		payload  map[string]json.RawMessage
+		expected string
+	}{
+		// 1. Gemini 4 Argon default is medium
+		{
+			model:    "gemini-4-argon",
+			payload:  map[string]json.RawMessage{},
+			expected: "gemini-4-argon-medium",
+		},
+		// 2. Gemini 4 Argon with explicit reasoning_effort: high
+		{
+			model: "gemini-4-argon",
+			payload: map[string]json.RawMessage{
+				"reasoning_effort": json.RawMessage(`"high"`),
+			},
+			expected: "gemini-4-argon-high",
+		},
+		// 3. Gemini 4 Argon with explicit thinking: {"effort": "low"}
+		{
+			model: "gemini4argon",
+			payload: map[string]json.RawMessage{
+				"thinking": json.RawMessage(`{"effort":"low"}`),
+			},
+			expected: "gemini-4-argon-low",
+		},
+		// 4. Gemini 3.8 Flash default is high
+		{
+			model:    "gemini-3.8-flash",
+			payload:  map[string]json.RawMessage{},
+			expected: "gemini-3.8-flash-high",
+		},
+		// 5. Claude Opus 5.5 default is high, with effort: medium
+		{
+			model: "claude-opus-5-5",
+			payload: map[string]json.RawMessage{
+				"reasoning_effort": json.RawMessage(`"medium"`),
+			},
+			expected: "claude-opus-5-5-medium",
+		},
+		// 6. Already suffixed models stay intact
+		{
+			model: "gemini-4-argon-low",
+			payload: map[string]json.RawMessage{
+				"reasoning_effort": json.RawMessage(`"high"`),
+			},
+			expected: "gemini-4-argon-low",
+		},
+	}
+
+	for _, tt := range tests {
+		actual := resolveUpstreamModel(tt.model, tt.payload, agProvider)
+		assert.Equal(t, tt.expected, actual, "model: %s", tt.model)
 	}
 }

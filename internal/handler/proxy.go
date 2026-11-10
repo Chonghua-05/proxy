@@ -77,9 +77,10 @@ func (h *ProxyHandler) resolveProviderAndRewriteBody(c echo.Context, apiKey *mod
 		targetProvider = defaultProvider
 	}
 
-	// Rewrite model if prefix was stripped
-	if cleanModel != modelStr {
-		newModelRaw, _ := json.Marshal(cleanModel)
+	// Resolve upstream model ID based on thinking / reasoning_effort parameters
+	finalModel := resolveUpstreamModel(cleanModel, payload, targetProvider)
+	if finalModel != modelStr {
+		newModelRaw, _ := json.Marshal(finalModel)
 		payload["model"] = newModelRaw
 		if newBody, err := json.Marshal(payload); err == nil {
 			body = newBody
@@ -91,16 +92,102 @@ func (h *ProxyHandler) resolveProviderAndRewriteBody(c echo.Context, apiKey *mod
 	return targetProvider, nil
 }
 
+func normalizeModelID(model string) string {
+	lower := strings.ToLower(strings.TrimSpace(model))
+	switch lower {
+	case "gemini4argon", "gemini-4-argon", "argon":
+		return "gemini-4-argon"
+	}
+	return model
+}
+
+func extractReasoningEffort(payload map[string]json.RawMessage) string {
+	if raw, ok := payload["reasoning_effort"]; ok {
+		var s string
+		if err := json.Unmarshal(raw, &s); err == nil && s != "" {
+			return strings.ToLower(strings.TrimSpace(s))
+		}
+	}
+	// Check nested thinking object (e.g. {"thinking": {"effort": "high"}})
+	if raw, ok := payload["thinking"]; ok {
+		var th struct {
+			Effort string `json:"effort"`
+			Level  string `json:"level"`
+		}
+		if err := json.Unmarshal(raw, &th); err == nil {
+			if th.Effort != "" {
+				return strings.ToLower(strings.TrimSpace(th.Effort))
+			}
+			if th.Level != "" {
+				return strings.ToLower(strings.TrimSpace(th.Level))
+			}
+		}
+	}
+	return ""
+}
+
+// resolveUpstreamModel maps clean base model IDs (e.g. gemini-4-argon, gemini-3.8-flash)
+// to upstream tiered IDs when targeting antigravity, controlled by reasoning_effort.
+func resolveUpstreamModel(model string, payload map[string]json.RawMessage, p *models.Provider) string {
+	// If the provider is not antigravity, return the clean model as-is
+	if p == nil || (p.QuotaType != "antigravity" && !strings.Contains(strings.ToLower(p.Name), "antigravity")) {
+		return model
+	}
+
+	effort := extractReasoningEffort(payload)
+	// Normalize effort to one of: low, medium, high
+	var level string
+	switch effort {
+	case "low", "minimal":
+		level = "low"
+	case "medium":
+		level = "medium"
+	case "high", "xhigh", "max":
+		level = "high"
+	}
+
+	lower := strings.ToLower(model)
+	// If already explicitly suffixed with tiered level, preserve it
+	if strings.HasSuffix(lower, "-low") || strings.HasSuffix(lower, "-medium") || strings.HasSuffix(lower, "-high") {
+		return model
+	}
+
+	switch lower {
+	case "gemini-4-argon", "gemini4argon", "argon":
+		if level == "" {
+			level = "medium" // Official default for Gemini 4 Argon
+		}
+		return "gemini-4-argon-" + level
+
+	case "gemini-3.8-flash":
+		if level == "" {
+			level = "high"
+		}
+		return "gemini-3.8-flash-" + level
+
+	case "claude-opus-5-5":
+		if level == "" {
+			level = "high"
+		}
+		return "claude-opus-5-5-" + level
+
+	case "claude-sonnet-5-5":
+		if level == "" {
+			level = "high"
+		}
+		return "claude-sonnet-5-5-" + level
+	}
+
+	return model
+}
+
 func routeModel(model string) (cleanModel string, targetProviderName string) {
 	// 1. Explicit prefix
-	if strings.HasPrefix(model, "web/") {
-		return strings.TrimPrefix(model, "web/"), "gemini-web"
-	}
 	if strings.HasPrefix(model, "ag/") {
-		return strings.TrimPrefix(model, "ag/"), "antigravity-local"
+		return normalizeModelID(strings.TrimPrefix(model, "ag/")), "antigravity-local"
 	}
 	if strings.HasPrefix(model, "antigravity/") {
-		return strings.TrimPrefix(model, "antigravity/"), "antigravity-local"
+		return normalizeModelID(strings.TrimPrefix(model, "antigravity/")), "antigravity-local"
 	}
 	if strings.HasPrefix(model, "opencode/") {
 		return strings.TrimPrefix(model, "opencode/"), "opencode-free"
@@ -114,12 +201,6 @@ func routeModel(model string) (cleanModel string, targetProviderName string) {
 
 	// 2. Heuristic model matching
 	lower := strings.ToLower(model)
-	if strings.HasPrefix(lower, "gemini-4") ||
-		strings.HasPrefix(lower, "argon") ||
-		strings.HasPrefix(lower, "gemini-3.1-pro") {
-		return model, "gemini-web"
-	}
-
 	if strings.HasSuffix(lower, "-free") ||
 		strings.HasPrefix(lower, "deepseek") ||
 		strings.HasPrefix(lower, "mimo") ||
@@ -134,7 +215,7 @@ func routeModel(model string) (cleanModel string, targetProviderName string) {
 	}
 
 	// Default to key's defaultProvider
-	return model, ""
+	return normalizeModelID(model), ""
 }
 
 func (h *ProxyHandler) ChatCompletion(c echo.Context) error {
