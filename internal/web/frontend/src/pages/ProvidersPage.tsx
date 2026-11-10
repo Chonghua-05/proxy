@@ -61,7 +61,7 @@ export default function ProvidersPage() {
       try {
         const data = await listProviders()
         if (stale) return
-        setProviders(data || [])
+        setProviders((data || []).filter((p) => p.name !== 'gemini-web'))
       } catch (err: unknown) {
         if (!stale) setError(err instanceof Error ? err.message : 'Failed to load providers')
       } finally {

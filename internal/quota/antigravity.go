@@ -257,15 +257,24 @@ func (d *AntigravityDriver) Fetch(ctx context.Context, p *models.Provider) (*Res
 		// it from Antigravity's fetchAvailableModels) so the coverage shown next
 		// to each bucket tracks what the upstream actually serves. Falls back to
 		// the static lists when the endpoint is unreachable.
-		liveGemini, liveClaudeGPT := groupModelIDs(fetchAvailableModelIDs(ctx, p.BaseURL, p.APIKey))
+		liveArgon, liveGemini, liveClaudeGPT := groupModelIDs(fetchAvailableModelIDs(ctx, p.BaseURL, p.APIKey))
 		for _, g := range summaryData.Groups {
-			isGemini := strings.Contains(strings.ToLower(g.DisplayName), "gemini")
+			lowerName := strings.ToLower(g.DisplayName)
+			isArgon := strings.Contains(lowerName, "argon")
+			isGemini := !isArgon && strings.Contains(lowerName, "gemini")
+
 			groupLabel := "Claude/GPT"
 			modelsList := claudeGPTGroupModels
 			if len(liveClaudeGPT) > 0 {
 				modelsList = liveClaudeGPT
 			}
-			if isGemini {
+			if isArgon {
+				groupLabel = "Gemini 4 Argon"
+				modelsList = []string{"gemini-4-argon"}
+				if len(liveArgon) > 0 {
+					modelsList = liveArgon
+				}
+			} else if isGemini {
 				groupLabel = "Gemini"
 				modelsList = geminiGroupModels
 				if len(liveGemini) > 0 {
@@ -409,7 +418,7 @@ func queryUserQuotaSummary(ctx context.Context, client *http.Client, baseURL, to
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "antigravity/2.21.1 linux/amd64")
+	req.Header.Set("User-Agent", "antigravity/hub/2.25.0 darwin/arm64")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -449,7 +458,7 @@ func queryUserQuota(ctx context.Context, client *http.Client, baseURL, token, pr
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "antigravity/2.21.1 linux/amd64")
+	req.Header.Set("User-Agent", "antigravity/hub/2.25.0 darwin/arm64")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -514,19 +523,45 @@ func fetchAvailableModelIDs(ctx context.Context, baseURL, apiKey string) []strin
 	return ids
 }
 
-// groupModelIDs splits live model IDs into the Gemini and Claude/GPT coverage
-// lists shown next to each quota bucket, preserving the upstream ordering.
-func groupModelIDs(ids []string) (gemini, claudeGPT []string) {
-	for _, id := range ids {
-		l := strings.ToLower(id)
-		switch {
-		case strings.Contains(l, "gemini"):
-			gemini = append(gemini, id)
-		case strings.Contains(l, "claude") || strings.Contains(l, "gpt"):
-			claudeGPT = append(claudeGPT, id)
+// stripThinkingSuffix removes -high, -medium, -low, -tiered from model IDs.
+func stripThinkingSuffix(id string) string {
+	for _, suffix := range []string{"-high", "-medium", "-low", "-tiered"} {
+		if strings.HasSuffix(id, suffix) {
+			return strings.TrimSuffix(id, suffix)
 		}
 	}
-	return gemini, claudeGPT
+	return id
+}
+
+// groupModelIDs splits live model IDs into the Argon, Gemini and Claude/GPT coverage
+// lists shown next to each quota bucket, normalized and deduplicated.
+func groupModelIDs(ids []string) (argon, gemini, claudeGPT []string) {
+	seenArgon := make(map[string]bool)
+	seenGemini := make(map[string]bool)
+	seenClaudeGPT := make(map[string]bool)
+
+	for _, rawID := range ids {
+		norm := stripThinkingSuffix(rawID)
+		l := strings.ToLower(norm)
+		switch {
+		case strings.Contains(l, "argon"):
+			if !seenArgon[norm] {
+				seenArgon[norm] = true
+				argon = append(argon, norm)
+			}
+		case strings.Contains(l, "gemini"):
+			if !seenGemini[norm] {
+				seenGemini[norm] = true
+				gemini = append(gemini, norm)
+			}
+		case strings.Contains(l, "claude") || strings.Contains(l, "gpt"):
+			if !seenClaudeGPT[norm] {
+				seenClaudeGPT[norm] = true
+				claudeGPT = append(claudeGPT, norm)
+			}
+		}
+	}
+	return argon, gemini, claudeGPT
 }
 
 func refreshGoogleToken(ctx context.Context, client *http.Client, clientID, clientSecret, refreshToken string) (string, error) {

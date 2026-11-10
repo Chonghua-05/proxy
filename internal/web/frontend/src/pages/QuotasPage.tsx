@@ -255,9 +255,9 @@ export default function QuotasPage() {
       // Present the cards alphabetically so the Gemini-backed providers
       // (antigravity-local, gemini-web) lead and the free OpenCode channel sits
       // last, instead of the backend's provider-creation order.
-      const ordered = [...(data || [])].sort((a, b) =>
-        a.provider_name.localeCompare(b.provider_name),
-      )
+      const ordered = [...(data || [])]
+        .filter((q) => q.provider_name !== 'gemini-web')
+        .sort((a, b) => a.provider_name.localeCompare(b.provider_name))
       setQuotas(ordered)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load quotas')
