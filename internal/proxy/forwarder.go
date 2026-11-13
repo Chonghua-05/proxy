@@ -526,7 +526,7 @@ func providerModelPrefix(providerName string) string {
 }
 
 func normalizeAntigravityListID(id string) string {
-	for _, suffix := range []string{"-high", "-medium", "-low", "-tiered"} {
+	for _, suffix := range []string{"-xhigh", "-high", "-medium", "-low", "-tiered"} {
 		if strings.HasSuffix(id, suffix) {
 			return strings.TrimSuffix(id, suffix)
 		}
