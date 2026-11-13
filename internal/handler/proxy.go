@@ -160,10 +160,10 @@ func resolveUpstreamModel(model string, payload map[string]json.RawMessage, p *m
 		return "gemini-4-argon-" + level
 
 	case "gemini-4-hydrogen", "gemini4hydrogen", "hydrogen":
-		if level == "" {
-			level = "high"
-		} else if effort == "xhigh" || effort == "max" {
+		if effort == "xhigh" || effort == "max" {
 			level = "xhigh"
+		} else {
+			level = "high"
 		}
 		return "gemini-4-hydrogen-" + level
 
