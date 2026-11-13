@@ -154,8 +154,8 @@ func resolveUpstreamModel(model string, payload map[string]json.RawMessage, p *m
 
 	switch lower {
 	case "gemini-4-argon", "gemini4argon", "argon":
-		if level == "" {
-			level = "medium" // Official default for Gemini 4 Argon
+		if level == "" || level == "medium" {
+			level = "high"
 		}
 		return "gemini-4-argon-" + level
 

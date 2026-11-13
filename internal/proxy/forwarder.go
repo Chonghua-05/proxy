@@ -318,6 +318,9 @@ func (f *Forwarder) ForwardChatCompletion(
 	defer resp.Body.Close()
 
 	if req.Stream {
+		if resp.StatusCode != http.StatusOK {
+			return f.handleNonStreaming(w, resp, req.Model, provider, apiKey)
+		}
 		return f.handleStreaming(w, resp, req.Model, provider, apiKey)
 	}
 	return f.handleNonStreaming(w, resp, req.Model, provider, apiKey)
